@@ -96,12 +96,18 @@ export default function Movimientos({ shift }: MovimientosProps) {
     const previousStock = product.stock;
     const newStock = previousStock + quantity;
 
-    await supabase.from('products').update({
+    const { error: updateError } = await supabase.from('products').update({
       stock: newStock,
       updated_at: new Date().toISOString()
     }).eq('id', product.id);
 
-    await supabase.from('inventory_movements').insert([{
+    if (updateError) {
+      console.error('Error actualizando stock:', updateError);
+      alert('Error actualizando el stock del producto');
+      return;
+    }
+
+    const { error: insertError } = await supabase.from('inventory_movements').insert([{
       product_id: product.id,
       product_code: product.code,
       product_name: product.name,
@@ -116,6 +122,12 @@ export default function Movimientos({ shift }: MovimientosProps) {
       shift_id: shift.id,
       notes: formData.notes || ''
     }]);
+
+    if (insertError) {
+      console.error('Error registrando movimiento:', insertError);
+      alert(`Error registrando el movimiento: ${insertError.message}\n\nPor favor, ejecuta el script SQL create_inventory_movements.sql en Supabase.`);
+      return;
+    }
 
     setFormData({
       product_id: '',

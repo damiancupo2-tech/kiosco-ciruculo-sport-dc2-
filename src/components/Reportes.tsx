@@ -18,10 +18,17 @@ export default function Reportes() {
   const [dateFilter, setDateFilter] = useState('today');
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [config, setConfig] = useState<Configuration | null>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     loadData();
     loadConfig();
+
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
   }, [dateFilter]);
 
   const loadConfig = async () => {
@@ -77,6 +84,9 @@ export default function Reportes() {
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
+    const offset = -3;
+    d.setHours(d.getHours() + offset);
+
     return d.toLocaleDateString('es-AR', {
       day: '2-digit',
       month: '2-digit',
@@ -86,10 +96,21 @@ export default function Reportes() {
 
   const formatTime = (iso: string) => {
     const d = new Date(iso);
+    const offset = -3;
+    d.setHours(d.getHours() + offset);
+
     return d.toLocaleTimeString('es-AR', {
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit',
+      hour12: false
+    });
+  };
+
+  const getCurrentTime = () => {
+    return currentTime.toLocaleTimeString('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
     });
   };
 

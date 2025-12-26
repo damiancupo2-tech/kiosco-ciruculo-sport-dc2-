@@ -67,7 +67,7 @@ export default function Stock() {
     return `P-${products.length + 1}`;
   };
 
-  // 🔧 CREAR / EDITAR PRODUCTO con control de BAJA de stock + validación de código único
+  // 🔧 CREAR / EDITAR PRODUCTO con control de stock + validación de código único
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -130,10 +130,10 @@ export default function Stock() {
     if (editingProduct) {
       const previousStock = editingProduct.stock ?? 0;
 
-      // ❌ Si intenta BAJAR el stock → pedir clave de admin
-      if (newStock < previousStock) {
+      // ❌ Si intenta CAMBIAR el stock (subir o bajar) → pedir clave de admin
+      if (newStock !== previousStock) {
         const ok = askAdminPassword();
-        if (!ok) return; // no guarda cambios
+        if (!ok) return;
       }
 
       await supabase

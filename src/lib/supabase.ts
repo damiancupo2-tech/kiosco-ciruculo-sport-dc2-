@@ -97,3 +97,21 @@ export interface Configuration {
   receipt_message: string;
   updated_at: string;
 }
+
+export interface InventoryMovement {
+  id: string;
+  product_id: string;
+  product_code: string;
+  product_name: string;
+  category: string;
+  type: 'sale' | 'purchase';
+  quantity: number;
+  previous_stock: number;
+  new_stock: number;
+  supplier?: string;
+  reference?: string;
+  user_name: string;
+  shift_id?: string;
+  notes?: string;
+  created_at: string;
+}

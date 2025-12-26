@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, Package, Wallet, BarChart3, Settings, Store } from 'lucide-react';
+import { ShoppingCart, Package, Wallet, BarChart3, Settings, Store, TrendingUp } from 'lucide-react';
 import { Shift, supabase, CashTransaction } from '../lib/supabase';
 import Ventas from './Ventas';
 import Stock from './Stock';
 import Caja from './Caja';
 import Reportes from './Reportes';
 import Configuracion from './Configuracion';
+import Movimientos from './Movimientos';
 
-type View = 'ventas' | 'stock' | 'caja' | 'reportes' | 'configuracion';
+type View = 'ventas' | 'stock' | 'movimientos' | 'caja' | 'reportes' | 'configuracion';
 
 interface DashboardProps {
   shift: Shift | null;
@@ -17,6 +18,7 @@ interface DashboardProps {
 export default function Dashboard({ shift, onCloseShift }: DashboardProps) {
   const [currentView, setCurrentView] = useState<View>('ventas');
   const [businessName, setBusinessName] = useState('Kiosco Damian');
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   const [cashInBox, setCashInBox] = useState(0);
   const [transferInBox, setTransferInBox] = useState(0);
@@ -25,6 +27,12 @@ export default function Dashboard({ shift, onCloseShift }: DashboardProps) {
 
   useEffect(() => {
     loadBusinessName();
+
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -47,6 +55,14 @@ export default function Dashboard({ shift, onCloseShift }: DashboardProps) {
     if (data) {
       setBusinessName(data.business_name);
     }
+  };
+
+  const getCurrentTime = () => {
+    return currentTime.toLocaleTimeString('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
   };
 
   const loadTotals = async () => {
@@ -106,6 +122,7 @@ export default function Dashboard({ shift, onCloseShift }: DashboardProps) {
   const menuItems = [
     { id: 'ventas' as View, label: 'Ventas', icon: ShoppingCart, color: 'from-emerald-500 to-teal-600' },
     { id: 'stock' as View, label: 'Inventario', icon: Package, color: 'from-blue-500 to-cyan-600' },
+    { id: 'movimientos' as View, label: 'Movimientos', icon: TrendingUp, color: 'from-indigo-500 to-purple-600' },
     { id: 'caja' as View, label: 'Caja', icon: Wallet, color: 'from-purple-500 to-pink-600' },
     { id: 'reportes' as View, label: 'Reportes', icon: BarChart3, color: 'from-orange-500 to-red-600' },
     { id: 'configuracion' as View, label: 'Configuración', icon: Settings, color: 'from-gray-500 to-slate-600' },
@@ -132,7 +149,7 @@ export default function Dashboard({ shift, onCloseShift }: DashboardProps) {
             <div className="flex items-center gap-4">
               <div className="text-right">
                 <p className="text-sm font-semibold text-slate-700">
-                  {shift ? 'Turno Activo' : 'Sin turno activo'}
+                  {shift ? `Turno Activo - ${getCurrentTime()}` : 'Sin turno activo'}
                 </p>
                 <p className="text-xs text-slate-500">
                   {shift ? `Usuario: ${shift.user_name}` : 'Usuario: -'}
@@ -231,6 +248,7 @@ export default function Dashboard({ shift, onCloseShift }: DashboardProps) {
               <div className="p-6">
                 {currentView === 'ventas' && <Ventas shift={shift} />}
                 {currentView === 'stock' && <Stock />}
+                {currentView === 'movimientos' && shift && <Movimientos shift={shift} />}
                 {currentView === 'caja' && <Caja shift={shift} onCloseShift={onCloseShift} />}
                 {currentView === 'reportes' && <Reportes />}
                 {currentView === 'configuracion' && <Configuracion />}

@@ -6,6 +6,7 @@ Sistema completo de Punto de Venta (POS) para kioscos y comercios pequeños. Des
 
 - **Gestión de Inventario**: Control completo de productos con alertas de stock bajo
 - **Sistema de Ventas**: Interfaz moderna tipo POS para procesamiento rápido de ventas
+- **Gestión de Compras**: Registro de facturas de compra con actualización automática de stock
 - **Gestión de Caja**: Control de ingresos y egresos con múltiples métodos de pago
 - **Reportes y Estadísticas**: Análisis detallado de ventas con filtros por período
 - **Gestión de Turnos**: Control de turnos de trabajo con cálculo automático de totales
@@ -36,7 +37,9 @@ kiosco-pos/
 │   ├── components/           # Componentes React
 │   │   ├── Dashboard.tsx     # Componente principal con navegación
 │   │   ├── Ventas.tsx        # Módulo de ventas (POS)
+│   │   ├── Compras.tsx       # Módulo de compras
 │   │   ├── Stock.tsx         # Gestión de inventario
+│   │   ├── Movimientos.tsx   # Movimientos de inventario
 │   │   ├── Caja.tsx          # Control de caja
 │   │   ├── Reportes.tsx      # Reportes y estadísticas
 │   │   └── Configuracion.tsx # Configuración del sistema
@@ -51,6 +54,7 @@ kiosco-pos/
 ├── dist/                     # Build de producción
 ├── .env                      # Variables de entorno
 ├── db-setup.sql              # Script de configuración de BD
+├── create_purchase_tables.sql # Script de tablas de compras
 ├── package.json              # Dependencias y scripts
 ├── vite.config.ts            # Configuración de Vite
 ├── tailwind.config.js        # Configuración de Tailwind
@@ -181,6 +185,20 @@ VITE_SUPABASE_ANON_KEY=tu_supabase_anon_key_aqui
 
 Esto creará todas las tablas necesarias con sus políticas de seguridad (RLS) e insertará productos de ejemplo.
 
+#### 5.1 Configurar Tablas de Compras (Opcional)
+
+Si deseas usar el módulo de compras, ejecuta también el script \`create_purchase_tables.sql\`:
+
+1. En el **SQL Editor** de Supabase
+2. Copia el contenido del archivo \`create_purchase_tables.sql\`
+3. Pégalo en el editor y haz clic en **Run**
+
+Esto creará las tablas necesarias para el módulo de compras:
+- \`purchase_invoices\`: Facturas de compra
+- \`purchase_invoice_items\`: Items de las facturas
+- \`purchase_payments\`: Pagos de facturas
+- Actualiza la tabla \`products\` agregando el campo \`supplier\`
+
 ### 6. Ejecutar el Proyecto
 
 #### Modo Desarrollo
@@ -226,7 +244,30 @@ npm run preview
 4. Completar venta
 5. El sistema actualiza automáticamente stock y caja
 
-### 2. Inventario (Stock)
+### 2. Compras
+**Ruta**: Dashboard → Compras
+
+**Funcionalidades**:
+- Crear facturas de compra con múltiples items
+- Agregar productos nuevos desde el formulario de compra
+- Actualización automática de stock al registrar compra
+- Actualización de precios de venta y compra
+- Registro automático de movimientos de inventario
+- Listado de facturas de compra con estados (Pendiente, Parcial, Pagada)
+- Detalle completo de cada factura
+- Registro de pagos parciales o totales
+- Integración automática con caja al pagar facturas
+
+**Flujo de Trabajo**:
+1. Seleccionar proveedor
+2. Agregar productos (existentes o nuevos)
+3. Definir cantidad, precio de compra y precio de venta
+4. Guardar factura (actualiza stock automáticamente)
+5. Ver listado de facturas pendientes
+6. Registrar pagos según disponibilidad
+7. Sistema actualiza caja con los egresos
+
+### 3. Inventario (Stock)
 **Ruta**: Dashboard → Inventario
 
 **Funcionalidades**:
@@ -247,7 +288,7 @@ npm run preview
 - Stock actual
 - Stock mínimo (para alertas)
 
-### 3. Caja
+### 4. Caja
 **Ruta**: Dashboard → Caja
 
 **Funcionalidades**:
@@ -263,9 +304,9 @@ npm run preview
 
 **Tipos de Movimientos**:
 - **Ingresos**: Ventas (automático), Otros ingresos (manual)
-- **Egresos**: Gastos, Pagos a proveedores, etc.
+- **Egresos**: Gastos, Pagos a proveedores, Pagos de compras, etc.
 
-### 4. Reportes
+### 5. Reportes
 **Ruta**: Dashboard → Reportes
 
 **Funcionalidades**:
@@ -287,7 +328,7 @@ npm run preview
 - Productos más vendidos
 - Distribución por método de pago
 
-### 5. Configuración
+### 6. Configuración
 **Ruta**: Dashboard → Configuración
 
 Módulo preparado para futuras expansiones:
@@ -412,11 +453,11 @@ El nombre "Kiosco Damian" está definido en:
 - [ ] Impresión de tickets/facturas
 - [ ] Exportación de reportes a PDF/Excel
 - [ ] Gráficos interactivos
-- [ ] Gestión de proveedores
 - [ ] Sistema de fidelización de clientes
 - [ ] Modo offline con sincronización
 - [ ] App móvil nativa
 - [ ] Integración con MercadoPago/Stripe
+- [ ] Cuentas corrientes para clientes y proveedores
 
 ## Contribuir
 

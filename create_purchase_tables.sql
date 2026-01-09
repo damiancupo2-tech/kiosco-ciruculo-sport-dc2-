@@ -34,7 +34,7 @@
 
   3. Security
     - Enable RLS on all new tables
-    - Add policies for authenticated users
+    - Add policies for public access (no authentication required)
 */
 
 -- Add supplier column to products if it doesn't exist
@@ -86,82 +86,82 @@ ALTER TABLE purchase_invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchase_invoice_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchase_payments ENABLE ROW LEVEL SECURITY;
 
--- Policies for purchase_invoices
-DROP POLICY IF EXISTS "Users can view purchase invoices" ON purchase_invoices;
-CREATE POLICY "Users can view purchase invoices"
+-- Policies for purchase_invoices (public access)
+DROP POLICY IF EXISTS "Public can view purchase invoices" ON purchase_invoices;
+CREATE POLICY "Public can view purchase invoices"
   ON purchase_invoices FOR SELECT
-  TO authenticated
+  TO public
   USING (true);
 
-DROP POLICY IF EXISTS "Users can insert purchase invoices" ON purchase_invoices;
-CREATE POLICY "Users can insert purchase invoices"
+DROP POLICY IF EXISTS "Public can insert purchase invoices" ON purchase_invoices;
+CREATE POLICY "Public can insert purchase invoices"
   ON purchase_invoices FOR INSERT
-  TO authenticated
+  TO public
   WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Users can update purchase invoices" ON purchase_invoices;
-CREATE POLICY "Users can update purchase invoices"
+DROP POLICY IF EXISTS "Public can update purchase invoices" ON purchase_invoices;
+CREATE POLICY "Public can update purchase invoices"
   ON purchase_invoices FOR UPDATE
-  TO authenticated
+  TO public
   USING (true)
   WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Users can delete purchase invoices" ON purchase_invoices;
-CREATE POLICY "Users can delete purchase invoices"
+DROP POLICY IF EXISTS "Public can delete purchase invoices" ON purchase_invoices;
+CREATE POLICY "Public can delete purchase invoices"
   ON purchase_invoices FOR DELETE
-  TO authenticated
+  TO public
   USING (true);
 
--- Policies for purchase_invoice_items
-DROP POLICY IF EXISTS "Users can view purchase invoice items" ON purchase_invoice_items;
-CREATE POLICY "Users can view purchase invoice items"
+-- Policies for purchase_invoice_items (public access)
+DROP POLICY IF EXISTS "Public can view purchase invoice items" ON purchase_invoice_items;
+CREATE POLICY "Public can view purchase invoice items"
   ON purchase_invoice_items FOR SELECT
-  TO authenticated
+  TO public
   USING (true);
 
-DROP POLICY IF EXISTS "Users can insert purchase invoice items" ON purchase_invoice_items;
-CREATE POLICY "Users can insert purchase invoice items"
+DROP POLICY IF EXISTS "Public can insert purchase invoice items" ON purchase_invoice_items;
+CREATE POLICY "Public can insert purchase invoice items"
   ON purchase_invoice_items FOR INSERT
-  TO authenticated
+  TO public
   WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Users can update purchase invoice items" ON purchase_invoice_items;
-CREATE POLICY "Users can update purchase invoice items"
+DROP POLICY IF EXISTS "Public can update purchase invoice items" ON purchase_invoice_items;
+CREATE POLICY "Public can update purchase invoice items"
   ON purchase_invoice_items FOR UPDATE
-  TO authenticated
+  TO public
   USING (true)
   WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Users can delete purchase invoice items" ON purchase_invoice_items;
-CREATE POLICY "Users can delete purchase invoice items"
+DROP POLICY IF EXISTS "Public can delete purchase invoice items" ON purchase_invoice_items;
+CREATE POLICY "Public can delete purchase invoice items"
   ON purchase_invoice_items FOR DELETE
-  TO authenticated
+  TO public
   USING (true);
 
--- Policies for purchase_payments
-DROP POLICY IF EXISTS "Users can view purchase payments" ON purchase_payments;
-CREATE POLICY "Users can view purchase payments"
+-- Policies for purchase_payments (public access)
+DROP POLICY IF EXISTS "Public can view purchase payments" ON purchase_payments;
+CREATE POLICY "Public can view purchase payments"
   ON purchase_payments FOR SELECT
-  TO authenticated
+  TO public
   USING (true);
 
-DROP POLICY IF EXISTS "Users can insert purchase payments" ON purchase_payments;
-CREATE POLICY "Users can insert purchase payments"
+DROP POLICY IF EXISTS "Public can insert purchase payments" ON purchase_payments;
+CREATE POLICY "Public can insert purchase payments"
   ON purchase_payments FOR INSERT
-  TO authenticated
+  TO public
   WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Users can update purchase payments" ON purchase_payments;
-CREATE POLICY "Users can update purchase payments"
+DROP POLICY IF EXISTS "Public can update purchase payments" ON purchase_payments;
+CREATE POLICY "Public can update purchase payments"
   ON purchase_payments FOR UPDATE
-  TO authenticated
+  TO public
   USING (true)
   WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Users can delete purchase payments" ON purchase_payments;
-CREATE POLICY "Users can delete purchase payments"
+DROP POLICY IF EXISTS "Public can delete purchase payments" ON purchase_payments;
+CREATE POLICY "Public can delete purchase payments"
   ON purchase_payments FOR DELETE
-  TO authenticated
+  TO public
   USING (true);
 
 -- Create indexes for better performance

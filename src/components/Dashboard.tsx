@@ -25,14 +25,26 @@ export default function Dashboard({ shift, onCloseShift }: DashboardProps) {
   const [qrInBox, setQrInBox] = useState(0);
   const [expensasInBox, setExpensasInBox] = useState(0);
 
+  const [monthlySales, setMonthlySales] = useState(0);
+  const [monthlyTransactions, setMonthlyTransactions] = useState(0);
+  const [monthlyProfit, setMonthlyProfit] = useState(0);
+
   useEffect(() => {
     loadBusinessName();
+    loadMonthlyTotals();
 
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
 
-    return () => clearInterval(timer);
+    const monthlyTimer = setInterval(() => {
+      loadMonthlyTotals();
+    }, 30000);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(monthlyTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -46,6 +58,16 @@ export default function Dashboard({ shift, onCloseShift }: DashboardProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shift]);
+
+  useEffect(() => {
+    if (currentView === 'ventas') {
+      loadMonthlyTotals();
+      if (shift) {
+        loadTotals();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentView]);
 
   const loadBusinessName = async () => {
     const { data } = await supabase
@@ -63,6 +85,40 @@ export default function Dashboard({ shift, onCloseShift }: DashboardProps) {
       minute: '2-digit',
       hour12: false
     });
+  };
+
+  const loadMonthlyTotals = async () => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    const { data: sales } = await supabase
+      .from('sales')
+      .select('total, items')
+      .gte('created_at', startOfMonth.toISOString())
+      .lte('created_at', endOfMonth.toISOString());
+
+    const totalSales = sales?.reduce((sum, s) => sum + Number(s.total), 0) || 0;
+    const totalTransactions = sales?.length || 0;
+
+    const { data: products } = await supabase
+      .from('products')
+      .select('cost');
+
+    const totalCost = sales?.reduce((sum, sale) => {
+      const items = sale.items as Array<{ product_id: string; quantity: number; price: number }>;
+      return sum + items.reduce((itemSum, item) => {
+        const product = products?.find((p: any) => p.id === item.product_id);
+        const cost = product?.cost || 0;
+        return itemSum + (cost * item.quantity);
+      }, 0);
+    }, 0) || 0;
+
+    const profit = totalSales - totalCost;
+
+    setMonthlySales(totalSales);
+    setMonthlyTransactions(totalTransactions);
+    setMonthlyProfit(profit);
   };
 
   const loadTotals = async () => {
@@ -153,43 +209,80 @@ export default function Dashboard({ shift, onCloseShift }: DashboardProps) {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Tarjetas de totales por método de pago */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-4 shadow border border-slate-200">
-            <p className="text-sm font-semibold text-slate-600">Caja Efectivo</p>
-            <p className="text-2xl font-bold text-emerald-600">
-              {shift ? `$${cashInBox.toFixed(2)}` : '--'}
-            </p>
-            <p className="text-xs text-slate-500 mt-1">
-              Efectivo inicial + ingresos - egresos
-            </p>
+        {/* Resumen del Mes */}
+        <div className="mb-6">
+          <h3 className="text-lg font-bold text-slate-800 mb-3">Resumen del Mes</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 shadow-lg text-white">
+              <p className="text-sm font-semibold opacity-90">Ventas Totales</p>
+              <p className="text-3xl font-bold mt-2">
+                ${monthlySales.toFixed(2)}
+              </p>
+              <p className="text-xs opacity-75 mt-2">
+                Facturación total del mes
+              </p>
+            </div>
+            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-5 shadow-lg text-white">
+              <p className="text-sm font-semibold opacity-90">Transacciones</p>
+              <p className="text-3xl font-bold mt-2">
+                {monthlyTransactions}
+              </p>
+              <p className="text-xs opacity-75 mt-2">
+                Ventas realizadas este mes
+              </p>
+            </div>
+            <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-5 shadow-lg text-white">
+              <p className="text-sm font-semibold opacity-90">Ganancia Estimada</p>
+              <p className="text-3xl font-bold mt-2">
+                ${monthlyProfit.toFixed(2)}
+              </p>
+              <p className="text-xs opacity-75 mt-2">
+                Ventas - costos del mes
+              </p>
+            </div>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow border border-slate-200">
-            <p className="text-sm font-semibold text-slate-600">Transferencias</p>
-            <p className="text-2xl font-bold text-slate-800">
-              {shift ? `$${transferInBox.toFixed(2)}` : '--'}
-            </p>
-            <p className="text-xs text-slate-500 mt-1">
-              Ingresos - egresos por transferencia
-            </p>
-          </div>
-          <div className="bg-white rounded-xl p-4 shadow border border-slate-200">
-            <p className="text-sm font-semibold text-slate-600">QR</p>
-            <p className="text-2xl font-bold text-slate-800">
-              {shift ? `$${qrInBox.toFixed(2)}` : '--'}
-            </p>
-            <p className="text-xs text-slate-500 mt-1">
-              Ingresos - egresos por QR
-            </p>
-          </div>
-          <div className="bg-white rounded-xl p-4 shadow border border-slate-200">
-            <p className="text-sm font-semibold text-slate-600">Expensas</p>
-            <p className="text-2xl font-bold text-slate-800">
-              {shift ? `$${expensasInBox.toFixed(2)}` : '--'}
-            </p>
-            <p className="text-xs text-slate-500 mt-1">
-              Ingresos - egresos por expensas
-            </p>
+        </div>
+
+        {/* Turno Actual */}
+        <div className="mb-6">
+          <h3 className="text-lg font-bold text-slate-800 mb-3">Turno Actual - Caja por Método de Pago</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-xl p-4 shadow border border-slate-200">
+              <p className="text-sm font-semibold text-slate-600">Caja Efectivo</p>
+              <p className="text-2xl font-bold text-emerald-600">
+                {shift ? `$${cashInBox.toFixed(2)}` : '--'}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Efectivo inicial + ingresos - egresos
+              </p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow border border-slate-200">
+              <p className="text-sm font-semibold text-slate-600">Transferencias</p>
+              <p className="text-2xl font-bold text-slate-800">
+                {shift ? `$${transferInBox.toFixed(2)}` : '--'}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Ingresos - egresos por transferencia
+              </p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow border border-slate-200">
+              <p className="text-sm font-semibold text-slate-600">QR</p>
+              <p className="text-2xl font-bold text-slate-800">
+                {shift ? `$${qrInBox.toFixed(2)}` : '--'}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Ingresos - egresos por QR
+              </p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow border border-slate-200">
+              <p className="text-sm font-semibold text-slate-600">Expensas</p>
+              <p className="text-2xl font-bold text-slate-800">
+                {shift ? `$${expensasInBox.toFixed(2)}` : '--'}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Ingresos - egresos por expensas
+              </p>
+            </div>
           </div>
         </div>
 

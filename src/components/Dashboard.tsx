@@ -70,48 +70,35 @@ export default function Dashboard({ shift, onCloseShift }: DashboardProps) {
 
     const { data } = await supabase
       .from('cash_transactions')
-      .select('*')
-      .eq('shift_id', shift.id);
+      .select('type, payment_method, amount')
+      .eq('shift_id', shift.id)
+      .order('created_at', { ascending: false });
 
     const transactions = (data || []) as CashTransaction[];
 
     const openingCash = Number(shift.opening_cash || 0);
 
-    // Efectivo
-    const incomeCash = transactions
-      .filter(t => t.type === 'income' && t.payment_method === 'efectivo')
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-    const expenseCash = transactions
-      .filter(t => t.type === 'expense' && t.payment_method === 'efectivo')
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-    const cash = openingCash + incomeCash - expenseCash;
+    const totals = transactions.reduce((acc, t) => {
+      const method = t.payment_method;
+      const amount = Number(t.amount);
 
-    // Transferencias
-    const incomeTransfer = transactions
-      .filter(t => t.type === 'income' && t.payment_method === 'transferencia')
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-    const expenseTransfer = transactions
-      .filter(t => t.type === 'expense' && t.payment_method === 'transferencia')
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-    const transfer = incomeTransfer - expenseTransfer;
+      if (!acc[method]) {
+        acc[method] = { income: 0, expense: 0 };
+      }
 
-    // QR
-    const incomeQr = transactions
-      .filter(t => t.type === 'income' && t.payment_method === 'qr')
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-    const expenseQr = transactions
-      .filter(t => t.type === 'expense' && t.payment_method === 'qr')
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-    const qr = incomeQr - expenseQr;
+      if (t.type === 'income') {
+        acc[method].income += amount;
+      } else {
+        acc[method].expense += amount;
+      }
 
-    // Expensas
-    const incomeExpensas = transactions
-      .filter(t => t.type === 'income' && t.payment_method === 'expensas')
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-    const expenseExpensas = transactions
-      .filter(t => t.type === 'expense' && t.payment_method === 'expensas')
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-    const expensas = incomeExpensas - expenseExpensas;
+      return acc;
+    }, {} as Record<string, { income: number; expense: number }>);
+
+    const cash = openingCash + (totals.efectivo?.income || 0) - (totals.efectivo?.expense || 0);
+    const transfer = (totals.transferencia?.income || 0) - (totals.transferencia?.expense || 0);
+    const qr = (totals.qr?.income || 0) - (totals.qr?.expense || 0);
+    const expensas = (totals.expensas?.income || 0) - (totals.expensas?.expense || 0);
 
     setCashInBox(cash);
     setTransferInBox(transfer);

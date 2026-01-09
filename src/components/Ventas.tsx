@@ -26,20 +26,25 @@ export default function Ventas({ shift }: VentasProps) {
 
   useEffect(() => {
     loadProducts();
-  }, []);
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadProducts();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const total = cart.reduce((sum, i) => sum + i.subtotal, 0);
 
-  // Ajuste automático de montos cuando cambia el total
   useEffect(() => {
     const sum = cashAmount + transferAmount + qrAmount + expensasAmount;
 
-    // Si hay total y no se ingresó nada, por defecto todo efectivo
     if (total > 0 && sum === 0) {
       setCashAmount(total);
     }
 
-    // Si no hay total pero quedaron montos cargados, los reseteamos
     if (total === 0 && sum !== 0) {
       setCashAmount(0);
       setTransferAmount(0);
@@ -50,12 +55,23 @@ export default function Ventas({ shift }: VentasProps) {
   }, [total]);
 
   const loadProducts = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from('products')
-      .select('*')
+      .select('id, code, name, category, price, stock')
       .eq('active', true)
-      .gt('stock', 0);
+      .gt('stock', 0)
+      .order('name', { ascending: true })
+      .limit(100);
 
+    if (selectedCategory !== 'todas') {
+      query = query.eq('category', selectedCategory);
+    }
+
+    if (search.trim()) {
+      query = query.ilike('name', `%${search.trim()}%`);
+    }
+
+    const { data } = await query;
     setProducts(data || []);
   };
 
@@ -241,7 +257,6 @@ export default function Ventas({ shift }: VentasProps) {
     loadProducts();
   };
 
-  // Lista de categorías para el filtro (predefinidas + las que existan en productos)
   const baseCategories = ['Bebida', 'Comida', 'Artículos de Deporte'];
   const categories = Array.from(
     new Set([
@@ -251,19 +266,6 @@ export default function Ventas({ shift }: VentasProps) {
         .filter((c): c is string => !!c && c.trim() !== ''),
     ])
   );
-
-  // Filtro combinado: categoría + buscador (nombre)
-  const filtered = products.filter((p) => {
-    const matchesCategory =
-      selectedCategory === 'todas' ||
-      (p.category || '').toLowerCase() === selectedCategory.toLowerCase();
-
-    const matchesSearch = p.name
-      .toLowerCase()
-      .includes(search.toLowerCase());
-
-    return matchesCategory && matchesSearch;
-  });
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -303,7 +305,7 @@ export default function Ventas({ shift }: VentasProps) {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-[500px] overflow-y-auto">
-          {filtered.map((p) => (
+          {products.map((p) => (
             <button
               key={p.id}
               onClick={() => addToCart(p)}

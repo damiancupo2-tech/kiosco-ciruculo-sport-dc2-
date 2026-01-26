@@ -7,7 +7,7 @@ interface CajaProps {
   onCloseShift: (closingCash: number) => void;
 }
 
-type PeriodType = 'today' | 'week' | 'month' | 'all';
+type PeriodType = 'today' | 'week' | 'month' | 'all' | 'custom';
 
 export default function Caja({ shift, onCloseShift }: CajaProps) {
   const [transactions, setTransactions] = useState<CashTransaction[]>([]);
@@ -16,6 +16,8 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closingCash, setClosingCash] = useState('');
   const [period, setPeriod] = useState<PeriodType>('all');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [formData, setFormData] = useState({
     type: 'income' as 'income' | 'expense',
     category: '',
@@ -42,6 +44,15 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
         start.setDate(1);
         start.setHours(0, 0, 0, 0);
         return { start, end: now };
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          const customStart = new Date(customStartDate);
+          const customEnd = new Date(customEndDate);
+          customStart.setHours(0, 0, 0, 0);
+          customEnd.setHours(23, 59, 59, 999);
+          return { start: customStart, end: customEnd };
+        }
+        return { start: new Date(0), end: now };
       case 'all':
         return { start: new Date(0), end: now };
       default:
@@ -64,7 +75,7 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
   useEffect(() => {
     const filtered = filterTransactionsByPeriod(transactions, period);
     setFilteredTransactions(filtered);
-  }, [transactions, period]);
+  }, [transactions, period, customStartDate, customEndDate]);
 
   const loadTransactions = async () => {
     const { data } = await supabase
@@ -275,7 +286,7 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
           <Filter size={18} className="text-slate-600" />
           <span className="font-semibold text-slate-800">Período:</span>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           <button
             onClick={() => setPeriod('today')}
             className={`px-4 py-2 rounded-lg font-medium transition-all ${
@@ -316,7 +327,44 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
           >
             Todo
           </button>
+          <button
+            onClick={() => setPeriod('custom')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              period === 'custom'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            Personalizado
+          </button>
         </div>
+
+        {period === 'custom' && (
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Fecha Inicio:
+              </label>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Fecha Fin:
+              </label>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tabla de movimientos */}

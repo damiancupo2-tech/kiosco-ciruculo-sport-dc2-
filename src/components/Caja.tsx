@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react';
 import { supabase, Shift, CashTransaction } from '../lib/supabase';
-import { Wallet, Plus, DollarSign, TrendingUp, TrendingDown, LogOut, Clock, Calendar } from 'lucide-react';
+import { Wallet, Plus, DollarSign, TrendingUp, TrendingDown, LogOut, Clock, Calendar, Filter } from 'lucide-react';
 
 interface CajaProps {
   shift: Shift | null;
   onCloseShift: (closingCash: number) => void;
 }
 
+type PeriodType = 'today' | 'week' | 'month' | 'all';
+
 export default function Caja({ shift, onCloseShift }: CajaProps) {
   const [transactions, setTransactions] = useState<CashTransaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<CashTransaction[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closingCash, setClosingCash] = useState('');
+  const [period, setPeriod] = useState<PeriodType>('all');
   const [formData, setFormData] = useState({
     type: 'income' as 'income' | 'expense',
     category: '',
@@ -20,18 +24,52 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
     description: ''
   });
 
-  useEffect(() => {
-    if (shift) {
-      loadTransactions();
+  const getDateRange = (periodType: PeriodType): { start: Date; end: Date } => {
+    const now = new Date();
+    const start = new Date();
+
+    switch (periodType) {
+      case 'today':
+        start.setHours(0, 0, 0, 0);
+        return { start, end: now };
+      case 'week':
+        const dayOfWeek = now.getDay();
+        const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        start.setDate(diff);
+        start.setHours(0, 0, 0, 0);
+        return { start, end: now };
+      case 'month':
+        start.setDate(1);
+        start.setHours(0, 0, 0, 0);
+        return { start, end: now };
+      case 'all':
+        return { start: new Date(0), end: now };
+      default:
+        return { start, end: now };
     }
+  };
+
+  const filterTransactionsByPeriod = (txns: CashTransaction[], periodType: PeriodType) => {
+    const { start, end } = getDateRange(periodType);
+    return txns.filter(t => {
+      const txDate = new Date(t.created_at);
+      return txDate >= start && txDate <= end;
+    });
+  };
+
+  useEffect(() => {
+    loadTransactions();
   }, [shift]);
 
+  useEffect(() => {
+    const filtered = filterTransactionsByPeriod(transactions, period);
+    setFilteredTransactions(filtered);
+  }, [transactions, period]);
+
   const loadTransactions = async () => {
-    if (!shift) return;
     const { data } = await supabase
       .from('cash_transactions')
       .select('*')
-      .eq('shift_id', shift.id)
       .order('created_at', { ascending: false });
     setTransactions(data || []);
   };
@@ -66,11 +104,11 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
     }
   };
 
-  // Totales generales
-  const totalIncome = transactions
+  // Totales generales usando transacciones filtradas
+  const totalIncome = filteredTransactions
     .filter(t => t.type === 'income')
     .reduce((sum, t) => sum + Number(t.amount), 0);
-  const totalExpense = transactions
+  const totalExpense = filteredTransactions
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + Number(t.amount), 0);
   const balance = totalIncome - totalExpense;
@@ -78,40 +116,40 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
   const openingCash = Number(shift?.opening_cash || 0);
   const expectedCash = openingCash + balance;
 
-  // Saldos por método de pago
+  // Saldos por método de pago usando transacciones filtradas
 
   // Efectivo: apertura + ingresos efectivo - egresos efectivo
-  const incomeCash = transactions
+  const incomeCash = filteredTransactions
     .filter(t => t.type === 'income' && t.payment_method === 'efectivo')
     .reduce((sum, t) => sum + Number(t.amount), 0);
-  const expenseCash = transactions
+  const expenseCash = filteredTransactions
     .filter(t => t.type === 'expense' && t.payment_method === 'efectivo')
     .reduce((sum, t) => sum + Number(t.amount), 0);
   const cashInBox = openingCash + incomeCash - expenseCash;
 
   // Transferencias: ingresos - egresos
-  const incomeTransfer = transactions
+  const incomeTransfer = filteredTransactions
     .filter(t => t.type === 'income' && t.payment_method === 'transferencia')
     .reduce((sum, t) => sum + Number(t.amount), 0);
-  const expenseTransfer = transactions
+  const expenseTransfer = filteredTransactions
     .filter(t => t.type === 'expense' && t.payment_method === 'transferencia')
     .reduce((sum, t) => sum + Number(t.amount), 0);
   const transferInBox = incomeTransfer - expenseTransfer;
 
   // QR: ingresos - egresos
-  const incomeQr = transactions
+  const incomeQr = filteredTransactions
     .filter(t => t.type === 'income' && t.payment_method === 'qr')
     .reduce((sum, t) => sum + Number(t.amount), 0);
-  const expenseQr = transactions
+  const expenseQr = filteredTransactions
     .filter(t => t.type === 'expense' && t.payment_method === 'qr')
     .reduce((sum, t) => sum + Number(t.amount), 0);
   const qrInBox = incomeQr - expenseQr;
 
   // Expensas: ingresos - egresos
-  const incomeExpensas = transactions
+  const incomeExpensas = filteredTransactions
     .filter(t => t.type === 'income' && t.payment_method === 'expensas')
     .reduce((sum, t) => sum + Number(t.amount), 0);
-  const expenseExpensas = transactions
+  const expenseExpensas = filteredTransactions
     .filter(t => t.type === 'expense' && t.payment_method === 'expensas')
     .reduce((sum, t) => sum + Number(t.amount), 0);
   const expensasInBox = incomeExpensas - expenseExpensas;
@@ -216,7 +254,12 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
 
       {/* Título tabla movimientos */}
       <div className="flex justify-between items-center">
-        <h3 className="text-xl font-bold text-slate-800">Movimientos de Caja</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-xl font-bold text-slate-800">Movimientos de Caja</h3>
+          <span className="text-sm text-slate-600 font-medium">
+            ({filteredTransactions.length})
+          </span>
+        </div>
         <button
           onClick={() => setShowModal(true)}
           className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white px-6 py-2.5 rounded-xl flex items-center gap-2 shadow-lg transition-all"
@@ -224,6 +267,56 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
           <Plus size={20} />
           Nuevo Movimiento
         </button>
+      </div>
+
+      {/* Filtro de período */}
+      <div className="bg-white rounded-xl shadow p-4 border border-slate-200">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter size={18} className="text-slate-600" />
+          <span className="font-semibold text-slate-800">Período:</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <button
+            onClick={() => setPeriod('today')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              period === 'today'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            Hoy
+          </button>
+          <button
+            onClick={() => setPeriod('week')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              period === 'week'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            Esta Semana
+          </button>
+          <button
+            onClick={() => setPeriod('month')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              period === 'month'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            Este Mes
+          </button>
+          <button
+            onClick={() => setPeriod('all')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              period === 'all'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            Todo
+          </button>
+        </div>
       </div>
 
       {/* Tabla de movimientos */}
@@ -252,32 +345,40 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
             </tr>
           </thead>
           <tbody>
-            {transactions.map((t) => (
-              <tr key={t.id} className="border-t border-slate-200 hover:bg-slate-50">
-                <td className="px-6 py-4 text-sm text-slate-700">
-                  {new Date(t.created_at).toLocaleString('es-AR')}
+            {filteredTransactions.length > 0 ? (
+              filteredTransactions.map((t) => (
+                <tr key={t.id} className="border-t border-slate-200 hover:bg-slate-50">
+                  <td className="px-6 py-4 text-sm text-slate-700">
+                    {new Date(t.created_at).toLocaleString('es-AR')}
+                  </td>
+                  <td className="px-6 py-4">
+                    {t.type === 'income' ? (
+                      <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-medium">
+                        <TrendingUp size={14} />
+                        Ingreso
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
+                        <TrendingDown size={14} />
+                        Egreso
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-700">{t.category}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-slate-800">
+                    ${Number(t.amount).toFixed(2)}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-700">{t.payment_method}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{t.description}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                  No hay movimientos en este período
                 </td>
-                <td className="px-6 py-4">
-                  {t.type === 'income' ? (
-                    <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-medium">
-                      <TrendingUp size={14} />
-                      Ingreso
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
-                      <TrendingDown size={14} />
-                      Egreso
-                    </span>
-                  )}
-                </td>
-                <td className="px-6 py-4 text-sm text-slate-700">{t.category}</td>
-                <td className="px-6 py-4 text-sm font-bold text-slate-800">
-                  ${Number(t.amount).toFixed(2)}
-                </td>
-                <td className="px-6 py-4 text-sm text-slate-700">{t.payment_method}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{t.description}</td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, X, Save, DollarSign, Package, FileText, Eye } from 'lucide-react';
+import { ShoppingCart, Plus, X, Save, DollarSign, Package, FileText, Eye, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface Product {
@@ -52,6 +52,9 @@ export default function Compras() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('efectivo');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
 
   const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
   const [currentItem, setCurrentItem] = useState({
@@ -329,6 +332,75 @@ export default function Compras() {
     alert(`Factura ${invoiceNumber} creada exitosamente`);
     setPurchaseItems([]);
     setSupplier('');
+    await loadProducts();
+    await loadInvoices();
+  };
+
+  const handleDeleteInvoice = async () => {
+    if (deletePassword !== '842114') {
+      alert('Contraseña incorrecta');
+      return;
+    }
+
+    if (!invoiceToDelete) return;
+
+    const invoiceToDeleteData = invoices.find(inv => inv.id === invoiceToDelete);
+
+    if (invoiceToDeleteData && invoiceToDeleteData.paid_amount > 0) {
+      alert('No se puede eliminar una factura con pagos registrados');
+      setShowDeleteModal(false);
+      setDeletePassword('');
+      setInvoiceToDelete(null);
+      return;
+    }
+
+    const { data: invoiceItems } = await supabase
+      .from('purchase_invoice_items')
+      .select('product_id, quantity')
+      .eq('invoice_id', invoiceToDelete);
+
+    if (invoiceItems) {
+      for (const item of invoiceItems) {
+        const { data: product } = await supabase
+          .from('products')
+          .select('stock')
+          .eq('id', item.product_id)
+          .single();
+
+        if (product) {
+          await supabase
+            .from('products')
+            .update({ stock: product.stock - item.quantity })
+            .eq('id', item.product_id);
+        }
+      }
+    }
+
+    await supabase
+      .from('inventory_movements')
+      .delete()
+      .eq('reference', invoiceToDeleteData?.invoice_number);
+
+    await supabase
+      .from('purchase_invoice_items')
+      .delete()
+      .eq('invoice_id', invoiceToDelete);
+
+    const { error } = await supabase
+      .from('purchase_invoices')
+      .delete()
+      .eq('id', invoiceToDelete);
+
+    if (error) {
+      alert('Error al eliminar la factura');
+      return;
+    }
+
+    alert('Factura eliminada exitosamente');
+    setShowDeleteModal(false);
+    setDeletePassword('');
+    setInvoiceToDelete(null);
+    setSelectedInvoice(null);
     await loadProducts();
     await loadInvoices();
   };
@@ -700,15 +772,27 @@ export default function Compras() {
               </div>
             </div>
 
-            {selectedInvoice.status !== 'paid' && (
+            <div className="space-y-2">
+              {selectedInvoice.status !== 'paid' && (
+                <button
+                  onClick={() => setShowPaymentModal(true)}
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2"
+                >
+                  <DollarSign className="w-5 h-5" />
+                  Registrar Pago
+                </button>
+              )}
               <button
-                onClick={() => setShowPaymentModal(true)}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2"
+                onClick={() => {
+                  setInvoiceToDelete(selectedInvoice.id);
+                  setShowDeleteModal(true);
+                }}
+                className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2"
               >
-                <DollarSign className="w-5 h-5" />
-                Registrar Pago
+                <Trash2 className="w-5 h-5" />
+                Eliminar Factura
               </button>
-            )}
+            </div>
           </div>
         </div>
       )}
@@ -770,6 +854,53 @@ export default function Compras() {
                 className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-lg font-semibold"
               >
                 Confirmar Pago
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-96">
+            <h3 className="text-lg font-bold text-red-600 mb-4 flex items-center gap-2">
+              <Trash2 className="w-5 h-5" />
+              Eliminar Factura
+            </h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Esta acción eliminará la factura y revertirá los cambios en el inventario. Esta acción no se puede deshacer.
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Contraseña de Super Administrador
+              </label>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                placeholder="Ingrese la contraseña"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeletePassword('');
+                  setInvoiceToDelete(null);
+                }}
+                className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-800 py-2 rounded-lg font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteInvoice}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg font-semibold"
+              >
+                Eliminar
               </button>
             </div>
           </div>

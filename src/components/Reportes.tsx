@@ -16,6 +16,8 @@ export default function Reportes() {
   const [cashTransactions, setCashTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState('today');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [config, setConfig] = useState<Configuration | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -29,7 +31,7 @@ export default function Reportes() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [dateFilter]);
+  }, [dateFilter, customStartDate, customEndDate]);
 
   const loadConfig = async () => {
     const { data } = await supabase
@@ -70,6 +72,13 @@ export default function Reportes() {
       const from = daysAgo30.toISOString();
       salesQuery = salesQuery.gte('created_at', from);
       cashQuery = cashQuery.gte('created_at', from);
+    } else if (dateFilter === 'custom' && customStartDate && customEndDate) {
+      const startDate = new Date(customStartDate);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(customEndDate);
+      endDate.setHours(23, 59, 59, 999);
+      salesQuery = salesQuery.gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString());
+      cashQuery = cashQuery.gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString());
     }
 
     const [{ data: salesData }, { data: cashData }] = await Promise.all([
@@ -532,7 +541,7 @@ export default function Reportes() {
         <h3 className="text-xl font-bold text-slate-800">
           Resumen de Ventas
         </h3>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
           <select
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
@@ -541,8 +550,27 @@ export default function Reportes() {
             <option value="today">Hoy</option>
             <option value="week">Última Semana</option>
             <option value="month">Último Mes</option>
+            <option value="custom">Personalizado</option>
             <option value="all">Todo</option>
           </select>
+          {dateFilter === 'custom' && (
+            <>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="px-3 py-2 bg-white border-2 border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-orange-500"
+                placeholder="Desde"
+              />
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="px-3 py-2 bg-white border-2 border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-orange-500"
+                placeholder="Hasta"
+              />
+            </>
+          )}
           <button
             onClick={exportToCSV}
             className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl flex items-center gap-2 font-medium shadow-lg transition-all"

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, Shift, CashTransaction } from '../lib/supabase';
-import { Wallet, Plus, DollarSign, TrendingUp, TrendingDown, LogOut, Clock, Calendar, Filter } from 'lucide-react';
+import { Wallet, Plus, DollarSign, TrendingUp, TrendingDown, LogOut, Clock, Calendar, Filter, X, Download } from 'lucide-react';
 
 interface CajaProps {
   shift: Shift | null;
@@ -14,6 +14,8 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
   const [filteredTransactions, setFilteredTransactions] = useState<CashTransaction[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<CashTransaction | null>(null);
   const [closingCash, setClosingCash] = useState('');
   const [period, setPeriod] = useState<PeriodType>('all');
   const [customStartDate, setCustomStartDate] = useState('');
@@ -113,6 +115,47 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
       setShowCloseModal(false);
       setClosingCash('');
     }
+  };
+
+  const handleTransactionClick = (transaction: CashTransaction) => {
+    setSelectedTransaction(transaction);
+    setShowDetailModal(true);
+  };
+
+  const exportToCSV = () => {
+    const headers = ['Fecha', 'Hora', 'Tipo', 'Categoría', 'Monto', 'Método de Pago', 'Descripción'];
+
+    const rows = filteredTransactions.map(t => {
+      const date = new Date(t.created_at);
+      return [
+        date.toLocaleDateString('es-AR'),
+        date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }),
+        t.type === 'income' ? 'Ingreso' : 'Egreso',
+        t.category,
+        t.amount.toFixed(2),
+        t.payment_method,
+        t.description || ''
+      ];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row =>
+        row.map(value => {
+          const v = String(value ?? '');
+          if (v.includes(',') || v.includes('"') || v.includes('\n')) {
+            return `"${v.replace(/"/g, '""')}"`;
+          }
+          return v;
+        }).join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `movimientos_caja_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
   };
 
   // Totales generales usando transacciones filtradas
@@ -268,20 +311,29 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
       </div>
 
       {/* Título tabla movimientos */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-4">
         <div className="flex items-center gap-2">
           <h3 className="text-xl font-bold text-slate-800">Movimientos de Caja</h3>
           <span className="text-sm text-slate-600 font-medium">
             ({filteredTransactions.length})
           </span>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white px-6 py-2.5 rounded-xl flex items-center gap-2 shadow-lg transition-all"
-        >
-          <Plus size={20} />
-          Nuevo Movimiento
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={exportToCSV}
+            className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-lg transition-all"
+          >
+            <Download size={18} />
+            Exportar
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white px-6 py-2.5 rounded-xl flex items-center gap-2 shadow-lg transition-all"
+          >
+            <Plus size={20} />
+            Nuevo Movimiento
+          </button>
+        </div>
       </div>
 
       {/* Filtro de período */}
@@ -399,7 +451,11 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
           <tbody>
             {filteredTransactions.length > 0 ? (
               filteredTransactions.map((t) => (
-                <tr key={t.id} className="border-t border-slate-200 hover:bg-slate-50">
+                <tr
+                  key={t.id}
+                  className="border-t border-slate-200 hover:bg-slate-50 cursor-pointer"
+                  onClick={() => handleTransactionClick(t)}
+                >
                   <td className="px-6 py-4 text-sm text-slate-700">
                     {new Date(t.created_at).toLocaleString('es-AR', {
                       day: '2-digit',
@@ -545,6 +601,93 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal detalle de movimiento */}
+      {showDetailModal && selectedTransaction && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-lg w-full shadow-2xl">
+            <div className="bg-gradient-to-r from-blue-500 to-cyan-600 p-6 rounded-t-xl flex items-center justify-between">
+              <h3 className="text-xl font-bold text-white">Detalle del Movimiento</h3>
+              <button
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setSelectedTransaction(null);
+                }}
+                className="text-white hover:text-slate-200"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-semibold text-slate-600">Tipo:</span>
+                  {selectedTransaction.type === 'income' ? (
+                    <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-medium">
+                      <TrendingUp size={14} />
+                      Ingreso
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
+                      <TrendingDown size={14} />
+                      Egreso
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-sm font-semibold text-slate-600">Fecha y Hora:</span>
+                  <span className="text-sm text-slate-900">
+                    {new Date(selectedTransaction.created_at).toLocaleString('es-AR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false
+                    })}
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-sm font-semibold text-slate-600">Categoría:</span>
+                  <span className="text-sm text-slate-900">{selectedTransaction.category}</span>
+                </div>
+
+                <div className="flex justify-between items-center border-t border-slate-200 pt-3">
+                  <span className="text-sm font-semibold text-slate-600">Monto:</span>
+                  <span className="text-2xl font-bold text-slate-900">
+                    ${Number(selectedTransaction.amount).toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-sm font-semibold text-slate-600">Método de Pago:</span>
+                  <span className="text-sm text-slate-900 capitalize">{selectedTransaction.payment_method}</span>
+                </div>
+
+                {selectedTransaction.description && (
+                  <div className="border-t border-slate-200 pt-3">
+                    <span className="text-sm font-semibold text-slate-600 block mb-1">Descripción:</span>
+                    <p className="text-sm text-slate-900">{selectedTransaction.description}</p>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setSelectedTransaction(null);
+                }}
+                className="w-full px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold rounded-lg"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

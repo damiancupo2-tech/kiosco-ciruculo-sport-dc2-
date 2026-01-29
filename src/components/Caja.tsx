@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase, Shift, CashTransaction } from '../lib/supabase';
-import { Wallet, Plus, DollarSign, TrendingUp, TrendingDown, LogOut, Clock, Calendar, Filter, X, Download } from 'lucide-react';
+import { supabase, Shift, CashTransaction, Sale, SaleItem } from '../lib/supabase';
+import { Wallet, Plus, DollarSign, TrendingUp, TrendingDown, LogOut, Clock, Calendar, Filter, X, Download, ShoppingCart } from 'lucide-react';
 
 interface CajaProps {
   shift: Shift | null;
@@ -16,6 +16,8 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<CashTransaction | null>(null);
+  const [saleDetails, setSaleDetails] = useState<Sale | null>(null);
+  const [loadingSaleDetails, setLoadingSaleDetails] = useState(false);
   const [closingCash, setClosingCash] = useState('');
   const [period, setPeriod] = useState<PeriodType>('all');
   const [customStartDate, setCustomStartDate] = useState('');
@@ -117,9 +119,35 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
     }
   };
 
-  const handleTransactionClick = (transaction: CashTransaction) => {
+  const handleTransactionClick = async (transaction: CashTransaction) => {
     setSelectedTransaction(transaction);
+    setSaleDetails(null);
     setShowDetailModal(true);
+
+    // Si es una venta, buscar los detalles
+    if (transaction.category === 'venta' && transaction.description) {
+      setLoadingSaleDetails(true);
+      try {
+        // Extraer el número de venta de la descripción (formato: "Venta V-1769655272303 - ...")
+        const match = transaction.description.match(/V-\d+/);
+        if (match) {
+          const saleNumber = match[0];
+          const { data } = await supabase
+            .from('sales')
+            .select('*')
+            .eq('sale_number', saleNumber)
+            .maybeSingle();
+
+          if (data) {
+            setSaleDetails(data);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading sale details:', error);
+      } finally {
+        setLoadingSaleDetails(false);
+      }
+    }
   };
 
   const exportToCSV = () => {
@@ -608,13 +636,16 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
       {/* Modal detalle de movimiento */}
       {showDetailModal && selectedTransaction && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-lg w-full shadow-2xl">
-            <div className="bg-gradient-to-r from-blue-500 to-cyan-600 p-6 rounded-t-xl flex items-center justify-between">
-              <h3 className="text-xl font-bold text-white">Detalle del Movimiento</h3>
+          <div className="bg-white rounded-xl max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-gradient-to-r from-blue-500 to-cyan-600 p-6 rounded-t-xl flex items-center justify-between sticky top-0">
+              <h3 className="text-xl font-bold text-white">
+                {selectedTransaction.category === 'venta' ? 'Detalle de Venta' : 'Detalle del Movimiento'}
+              </h3>
               <button
                 onClick={() => {
                   setShowDetailModal(false);
                   setSelectedTransaction(null);
+                  setSaleDetails(null);
                 }}
                 className="text-white hover:text-slate-200"
               >
@@ -659,7 +690,7 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
                 </div>
 
                 <div className="flex justify-between items-center border-t border-slate-200 pt-3">
-                  <span className="text-sm font-semibold text-slate-600">Monto:</span>
+                  <span className="text-sm font-semibold text-slate-600">Monto Total:</span>
                   <span className="text-2xl font-bold text-slate-900">
                     ${Number(selectedTransaction.amount).toFixed(2)}
                   </span>
@@ -678,10 +709,97 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
                 )}
               </div>
 
+              {/* Detalle de productos vendidos */}
+              {selectedTransaction.category === 'venta' && (
+                <div className="bg-white border-2 border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <ShoppingCart className="text-blue-600" size={20} />
+                    <h4 className="font-bold text-slate-800">Productos Vendidos</h4>
+                  </div>
+
+                  {loadingSaleDetails ? (
+                    <div className="text-center py-4 text-slate-500">
+                      <div className="animate-pulse">Cargando productos...</div>
+                    </div>
+                  ) : saleDetails && saleDetails.items ? (
+                    <div className="space-y-2">
+                      {/* Tabla de productos */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-100">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600">Producto</th>
+                              <th className="px-3 py-2 text-center text-xs font-semibold text-slate-600">Cant.</th>
+                              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600">Precio</th>
+                              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600">Subtotal</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {saleDetails.items.map((item: SaleItem, idx: number) => (
+                              <tr key={idx} className="border-t border-slate-200">
+                                <td className="px-3 py-2 text-slate-800">{item.product_name}</td>
+                                <td className="px-3 py-2 text-center text-slate-700">x{item.quantity}</td>
+                                <td className="px-3 py-2 text-right text-slate-700">${Number(item.price).toFixed(2)}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-slate-900">
+                                  ${Number(item.subtotal).toFixed(2)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-slate-50 border-t-2 border-slate-300">
+                            <tr>
+                              <td colSpan={3} className="px-3 py-2 text-right font-bold text-slate-700">Subtotal:</td>
+                              <td className="px-3 py-2 text-right font-bold text-slate-900">
+                                ${Number(saleDetails.subtotal).toFixed(2)}
+                              </td>
+                            </tr>
+                            {saleDetails.discount > 0 && (
+                              <tr>
+                                <td colSpan={3} className="px-3 py-2 text-right font-semibold text-red-600">Descuento:</td>
+                                <td className="px-3 py-2 text-right font-semibold text-red-600">
+                                  -${Number(saleDetails.discount).toFixed(2)}
+                                </td>
+                              </tr>
+                            )}
+                            <tr className="border-t border-slate-300">
+                              <td colSpan={3} className="px-3 py-2 text-right font-bold text-slate-800">Total:</td>
+                              <td className="px-3 py-2 text-right font-bold text-blue-600 text-lg">
+                                ${Number(saleDetails.total).toFixed(2)}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+
+                      {/* Información adicional de la venta */}
+                      {(saleDetails.customer_name || saleDetails.customer_lot) && (
+                        <div className="mt-3 pt-3 border-t border-slate-200 text-sm">
+                          {saleDetails.customer_name && (
+                            <p className="text-slate-700">
+                              <span className="font-semibold">Cliente:</span> {saleDetails.customer_name}
+                            </p>
+                          )}
+                          {saleDetails.customer_lot && (
+                            <p className="text-slate-700">
+                              <span className="font-semibold">Lote:</span> {saleDetails.customer_lot}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-slate-500">
+                      No se pudieron cargar los detalles de la venta
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button
                 onClick={() => {
                   setShowDetailModal(false);
                   setSelectedTransaction(null);
+                  setSaleDetails(null);
                 }}
                 className="w-full px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold rounded-lg"
               >

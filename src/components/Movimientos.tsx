@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, InventoryMovement, Product, Shift } from '../lib/supabase';
-import { Package, Plus, Filter, TrendingUp, TrendingDown, Search } from 'lucide-react';
+import { Package, Plus, Filter, TrendingUp, TrendingDown, Search, Lock } from 'lucide-react';
 
 interface MovimientosProps {
   shift: Shift;
@@ -11,6 +11,8 @@ export default function Movimientos({ shift }: MovimientosProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [password, setPassword] = useState('');
 
   const [filterType, setFilterType] = useState<'all' | 'sale' | 'purchase'>('all');
   const [filterDate, setFilterDate] = useState('today');
@@ -76,6 +78,17 @@ export default function Movimientos({ shift }: MovimientosProps) {
     setMovements(movementsData || []);
     setProducts(productsData || []);
     setLoading(false);
+  };
+
+  const handlePasswordSubmit = () => {
+    if (password !== '842114') {
+      alert('Contraseña incorrecta');
+      return;
+    }
+
+    setShowPasswordModal(false);
+    setPassword('');
+    setShowAddModal(true);
   };
 
   const handleAddMovement = async (e: React.FormEvent) => {
@@ -170,7 +183,7 @@ export default function Movimientos({ shift }: MovimientosProps) {
         </div>
 
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => setShowPasswordModal(true)}
           className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-2.5 rounded-xl flex items-center gap-2 shadow-lg transition-all duration-200 hover:scale-105"
         >
           <Plus size={20} />
@@ -356,6 +369,57 @@ export default function Movimientos({ shift }: MovimientosProps) {
                 No hay movimientos para mostrar
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl p-6 w-96 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <Lock className="w-5 h-5 text-amber-600" />
+              Autorización Requerida
+            </h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Ingresa la contraseña de Super Administrador para cargar mercadería
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Contraseña
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handlePasswordSubmit();
+                  }
+                }}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                placeholder="Ingrese la contraseña"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowPasswordModal(false);
+                  setPassword('');
+                }}
+                className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-800 py-2 rounded-lg font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handlePasswordSubmit}
+                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-lg font-semibold"
+              >
+                Confirmar
+              </button>
+            </div>
           </div>
         </div>
       )}

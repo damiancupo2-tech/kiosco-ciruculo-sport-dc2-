@@ -50,10 +50,11 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
         return { start, end: now };
       case 'custom':
         if (customStartDate && customEndDate) {
-          const customStart = new Date(customStartDate);
-          const customEnd = new Date(customEndDate);
-          customStart.setHours(0, 0, 0, 0);
-          customEnd.setHours(23, 59, 59, 999);
+          const [startYear, startMonth, startDay] = customStartDate.split('-').map(Number);
+          const [endYear, endMonth, endDay] = customEndDate.split('-').map(Number);
+
+          const customStart = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0);
+          const customEnd = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999);
           return { start: customStart, end: customEnd };
         }
         return { start: new Date(0), end: now };

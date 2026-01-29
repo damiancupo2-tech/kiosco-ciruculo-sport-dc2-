@@ -73,10 +73,12 @@ export default function Reportes() {
       salesQuery = salesQuery.gte('created_at', from);
       cashQuery = cashQuery.gte('created_at', from);
     } else if (dateFilter === 'custom' && customStartDate && customEndDate) {
-      const startDate = new Date(customStartDate);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(customEndDate);
-      endDate.setHours(23, 59, 59, 999);
+      const [startYear, startMonth, startDay] = customStartDate.split('-').map(Number);
+      const [endYear, endMonth, endDay] = customEndDate.split('-').map(Number);
+
+      const startDate = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0);
+      const endDate = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999);
+
       salesQuery = salesQuery.gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString());
       cashQuery = cashQuery.gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString());
     }

@@ -434,32 +434,41 @@ export default function Compras() {
       });
 
     if (paymentError) {
-      alert('Error al registrar el pago');
+      console.error('Error al registrar el pago:', paymentError);
+      alert(`Error al registrar el pago: ${paymentError.message}`);
       return;
     }
 
-    if (activeShift) {
-      await supabase
-        .from('cash_transactions')
-        .insert({
-          shift_id: activeShift.id,
-          type: 'expense',
-          category: 'Compras',
-          amount: amount,
-          payment_method: paymentMethod,
-          description: `Pago factura ${selectedInvoice.invoice_number} - ${selectedInvoice.supplier}`,
-        });
+    const { error: transactionError } = await supabase
+      .from('cash_transactions')
+      .insert({
+        shift_id: activeShift.id,
+        type: 'expense',
+        category: 'Compras',
+        amount: amount,
+        payment_method: paymentMethod,
+        description: `Pago factura ${selectedInvoice.invoice_number} - ${selectedInvoice.supplier}`,
+      });
 
-      const newExpenses = (activeShift.total_expenses || 0) + amount;
-      await supabase
-        .from('shifts')
-        .update({ total_expenses: newExpenses })
-        .eq('id', activeShift.id);
-
-      await loadActiveShift();
+    if (transactionError) {
+      console.error('Error al registrar movimiento de caja:', transactionError);
+      alert(`Error al registrar movimiento de caja: ${transactionError.message}`);
+      return;
     }
 
-    alert('Pago registrado exitosamente');
+    const newExpenses = (activeShift.total_expenses || 0) + amount;
+    const { error: shiftError } = await supabase
+      .from('shifts')
+      .update({ total_expenses: newExpenses })
+      .eq('id', activeShift.id);
+
+    if (shiftError) {
+      console.error('Error al actualizar el turno:', shiftError);
+    }
+
+    await loadActiveShift();
+
+    alert('Pago registrado exitosamente en caja');
     setShowPaymentModal(false);
     setPaymentAmount('');
     setPaymentMethod('efectivo');

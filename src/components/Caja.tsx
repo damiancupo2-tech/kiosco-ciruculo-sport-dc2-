@@ -189,7 +189,11 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
               </span>
               <span className="flex items-center gap-2">
                 <Clock size={16} />
-                {new Date(shift.start_date).toLocaleTimeString('es-AR')}
+                {new Date(shift.start_date).toLocaleTimeString('es-AR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false
+                })}
               </span>
             </div>
             <p className="text-lg">
@@ -397,7 +401,14 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
               filteredTransactions.map((t) => (
                 <tr key={t.id} className="border-t border-slate-200 hover:bg-slate-50">
                   <td className="px-6 py-4 text-sm text-slate-700">
-                    {new Date(t.created_at).toLocaleString('es-AR')}
+                    {new Date(t.created_at).toLocaleString('es-AR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false
+                    })}
                   </td>
                   <td className="px-6 py-4">
                     {t.type === 'income' ? (
@@ -555,7 +566,14 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
                 <div className="flex justify-between">
                   <span className="font-semibold text-slate-700">Hora Inicio:</span>
                   <span className="text-slate-900">
-                    {new Date(shift.start_date).toLocaleString('es-AR')}
+                    {new Date(shift.start_date).toLocaleString('es-AR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false
+                    })}
                   </span>
                 </div>
                 <div className="flex justify-between">

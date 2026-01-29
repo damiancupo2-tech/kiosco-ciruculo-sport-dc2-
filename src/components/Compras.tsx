@@ -280,7 +280,8 @@ export default function Compras() {
       }
 
       const previousStock = product.stock || 0;
-      const newStock = previousStock + item.quantity;
+      const quantityInt = Math.round(item.quantity);
+      const newStock = previousStock + quantityInt;
 
       const { data: updatedProduct, error: updateError } = await supabase
         .from('products')
@@ -310,11 +311,11 @@ export default function Compras() {
           product_name: product.name || item.product_name,
           category: product.category || '',
           type: 'purchase',
-          quantity: item.quantity,
+          quantity: quantityInt,
           previous_stock: previousStock,
           new_stock: newStock,
-          supplier: supplier,
-          reference: invoiceNumber,
+          supplier: supplier || '',
+          reference: invoiceNumber || '',
           user_name: currentUser?.full_name || 'Sistema',
           shift_id: activeShift?.id || null,
           notes: `Compra ${invoiceNumber}`,

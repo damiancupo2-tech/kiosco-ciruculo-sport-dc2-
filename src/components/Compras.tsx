@@ -267,11 +267,17 @@ export default function Compras() {
     }
 
     for (const item of purchaseItems) {
-      const product = products.find(p => p.id === item.product_id);
-      if (product) {
-        const newStock = product.stock + item.quantity;
+      const { data: product } = await supabase
+        .from('products')
+        .select('id, code, name, category, stock')
+        .eq('id', item.product_id)
+        .single();
 
-        await supabase
+      if (product) {
+        const previousStock = product.stock || 0;
+        const newStock = previousStock + item.quantity;
+
+        const { error: updateError } = await supabase
           .from('products')
           .update({
             stock: newStock,
@@ -281,22 +287,22 @@ export default function Compras() {
           })
           .eq('id', item.product_id);
 
-        const updatedProduct = await supabase
-          .from('products')
-          .select('code, name, category')
-          .eq('id', item.product_id)
-          .single();
+        if (updateError) {
+          console.error('Error actualizando stock:', updateError);
+          alert(`Error actualizando stock del producto ${item.product_name}: ${updateError.message}`);
+          continue;
+        }
 
-        await supabase
+        const { error: movementError } = await supabase
           .from('inventory_movements')
           .insert({
             product_id: item.product_id,
-            product_code: updatedProduct.data?.code || '',
-            product_name: updatedProduct.data?.name || item.product_name,
-            category: updatedProduct.data?.category || '',
+            product_code: product.code || '',
+            product_name: product.name || item.product_name,
+            category: product.category || '',
             type: 'purchase',
             quantity: item.quantity,
-            previous_stock: product.stock,
+            previous_stock: previousStock,
             new_stock: newStock,
             supplier: supplier,
             reference: invoiceNumber,
@@ -304,6 +310,10 @@ export default function Compras() {
             shift_id: activeShift?.id || null,
             notes: `Compra ${invoiceNumber}`,
           });
+
+        if (movementError) {
+          console.error('Error registrando movimiento:', movementError);
+        }
       }
     }
 

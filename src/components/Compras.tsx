@@ -267,53 +267,61 @@ export default function Compras() {
     }
 
     for (const item of purchaseItems) {
-      const { data: product } = await supabase
+      const { data: product, error: selectError } = await supabase
         .from('products')
         .select('id, code, name, category, stock')
         .eq('id', item.product_id)
         .single();
 
-      if (product) {
-        const previousStock = product.stock || 0;
-        const newStock = previousStock + item.quantity;
+      if (selectError || !product) {
+        console.error('Error obteniendo producto:', selectError);
+        alert(`Error obteniendo producto ${item.product_name}`);
+        continue;
+      }
 
-        const { error: updateError } = await supabase
-          .from('products')
-          .update({
-            stock: newStock,
-            cost: item.purchase_price,
-            price: item.sale_price,
-            supplier: supplier,
-          })
-          .eq('id', item.product_id);
+      const previousStock = product.stock || 0;
+      const newStock = previousStock + item.quantity;
 
-        if (updateError) {
-          console.error('Error actualizando stock:', updateError);
-          alert(`Error actualizando stock del producto ${item.product_name}: ${updateError.message}`);
-          continue;
-        }
+      const { data: updatedProduct, error: updateError } = await supabase
+        .from('products')
+        .update({
+          stock: newStock,
+          cost: item.purchase_price,
+          price: item.sale_price,
+          supplier: supplier,
+        })
+        .eq('id', item.product_id)
+        .select()
+        .single();
 
-        const { error: movementError } = await supabase
-          .from('inventory_movements')
-          .insert({
-            product_id: item.product_id,
-            product_code: product.code || '',
-            product_name: product.name || item.product_name,
-            category: product.category || '',
-            type: 'purchase',
-            quantity: item.quantity,
-            previous_stock: previousStock,
-            new_stock: newStock,
-            supplier: supplier,
-            reference: invoiceNumber,
-            user_name: currentUser?.full_name || 'Sistema',
-            shift_id: activeShift?.id || null,
-            notes: `Compra ${invoiceNumber}`,
-          });
+      if (updateError || !updatedProduct) {
+        console.error('Error actualizando stock:', updateError);
+        alert(`Error actualizando stock del producto ${item.product_name}: ${updateError?.message || 'Error desconocido'}`);
+        continue;
+      }
 
-        if (movementError) {
-          console.error('Error registrando movimiento:', movementError);
-        }
+      console.log(`Stock actualizado: ${previousStock} -> ${newStock}`);
+
+      const { error: movementError } = await supabase
+        .from('inventory_movements')
+        .insert({
+          product_id: item.product_id,
+          product_code: product.code || '',
+          product_name: product.name || item.product_name,
+          category: product.category || '',
+          type: 'purchase',
+          quantity: item.quantity,
+          previous_stock: previousStock,
+          new_stock: newStock,
+          supplier: supplier,
+          reference: invoiceNumber,
+          user_name: currentUser?.full_name || 'Sistema',
+          shift_id: activeShift?.id || null,
+          notes: `Compra ${invoiceNumber}`,
+        });
+
+      if (movementError) {
+        console.error('Error registrando movimiento:', movementError);
       }
     }
 

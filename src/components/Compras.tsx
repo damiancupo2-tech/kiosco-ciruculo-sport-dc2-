@@ -64,11 +64,31 @@ export default function Compras() {
   const [supplier, setSupplier] = useState('');
   const [showNewProductModal, setShowNewProductModal] = useState(false);
   const [newProductName, setNewProductName] = useState('');
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [activeShift, setActiveShift] = useState<any>(null);
 
   useEffect(() => {
     loadProducts();
     loadInvoices();
+    loadCurrentUser();
+    loadActiveShift();
   }, []);
+
+  const loadCurrentUser = () => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      setCurrentUser(JSON.parse(userStr));
+    }
+  };
+
+  const loadActiveShift = async () => {
+    const { data } = await supabase
+      .from('shifts')
+      .select('*')
+      .eq('active', true)
+      .maybeSingle();
+    setActiveShift(data);
+  };
 
   const loadProducts = async () => {
     const { data } = await supabase
@@ -130,13 +150,17 @@ export default function Compras() {
   const handleAddNewProduct = async () => {
     if (!newProductName.trim()) return;
 
+    const productCode = `PROD-${Date.now().toString().slice(-8)}`;
+
     const { data, error } = await supabase
       .from('products')
       .insert({
+        code: productCode,
         name: newProductName,
         price: parseFloat(currentItem.sale_price) || 0,
         cost: parseFloat(currentItem.purchase_price) || 0,
         stock: 0,
+        category: '',
         supplier: supplier,
       })
       .select()
@@ -245,23 +269,40 @@ export default function Compras() {
     for (const item of purchaseItems) {
       const product = products.find(p => p.id === item.product_id);
       if (product) {
+        const newStock = product.stock + item.quantity;
+
         await supabase
           .from('products')
           .update({
-            stock: product.stock + item.quantity,
+            stock: newStock,
             cost: item.purchase_price,
             price: item.sale_price,
             supplier: supplier,
           })
           .eq('id', item.product_id);
 
+        const updatedProduct = await supabase
+          .from('products')
+          .select('code, name, category')
+          .eq('id', item.product_id)
+          .single();
+
         await supabase
           .from('inventory_movements')
           .insert({
             product_id: item.product_id,
-            type: 'entrada',
+            product_code: updatedProduct.data?.code || '',
+            product_name: updatedProduct.data?.name || item.product_name,
+            category: updatedProduct.data?.category || '',
+            type: 'purchase',
             quantity: item.quantity,
-            reason: `Compra ${invoiceNumber}`,
+            previous_stock: product.stock,
+            new_stock: newStock,
+            supplier: supplier,
+            reference: invoiceNumber,
+            user_name: currentUser?.full_name || 'Sistema',
+            shift_id: activeShift?.id || null,
+            notes: `Compra ${invoiceNumber}`,
           });
       }
     }
@@ -275,6 +316,11 @@ export default function Compras() {
 
   const handlePayInvoice = async () => {
     if (!selectedInvoice) return;
+
+    if (!activeShift) {
+      alert('Debe haber un turno activo para registrar pagos');
+      return;
+    }
 
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
@@ -301,14 +347,26 @@ export default function Compras() {
       return;
     }
 
-    await supabase
-      .from('cash_transactions')
-      .insert({
-        type: 'egreso',
-        amount: amount,
-        payment_method: paymentMethod,
-        description: `Pago compra ${selectedInvoice.invoice_number}`,
-      });
+    if (activeShift) {
+      await supabase
+        .from('cash_transactions')
+        .insert({
+          shift_id: activeShift.id,
+          type: 'expense',
+          category: 'Compras',
+          amount: amount,
+          payment_method: paymentMethod,
+          description: `Pago factura ${selectedInvoice.invoice_number} - ${selectedInvoice.supplier}`,
+        });
+
+      const newExpenses = (activeShift.total_expenses || 0) + amount;
+      await supabase
+        .from('shifts')
+        .update({ total_expenses: newExpenses })
+        .eq('id', activeShift.id);
+
+      await loadActiveShift();
+    }
 
     alert('Pago registrado exitosamente');
     setShowPaymentModal(false);

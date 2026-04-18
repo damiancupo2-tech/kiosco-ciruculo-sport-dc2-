@@ -7,7 +7,7 @@ interface CajaProps {
   onCloseShift: (closingCash: number) => void;
 }
 
-type PeriodType = 'today' | 'week' | 'month' | 'all' | 'custom';
+type PeriodType = 'today' | 'week' | 'month' | 'previous_month' | 'all' | 'custom';
 
 interface DailyReport {
   date: string;
@@ -62,6 +62,17 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
         start.setDate(1);
         start.setHours(0, 0, 0, 0);
         return { start, end: now };
+      case 'previous_month':
+        const prevMonthStart = new Date();
+        prevMonthStart.setMonth(prevMonthStart.getMonth() - 1);
+        prevMonthStart.setDate(1);
+        prevMonthStart.setHours(0, 0, 0, 0);
+
+        const prevMonthEnd = new Date();
+        prevMonthEnd.setDate(0);
+        prevMonthEnd.setHours(23, 59, 59, 999);
+
+        return { start: prevMonthStart, end: prevMonthEnd };
       case 'custom':
         if (customStartDate && customEndDate) {
           const [startYear, startMonth, startDay] = customStartDate.split('-').map(Number);
@@ -522,7 +533,7 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
           <Filter size={18} className="text-slate-600" />
           <span className="font-semibold text-slate-800">Período:</span>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
           <button
             onClick={() => setPeriod('today')}
             className={`px-4 py-2 rounded-lg font-medium transition-all ${
@@ -552,6 +563,16 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
             }`}
           >
             Este Mes
+          </button>
+          <button
+            onClick={() => setPeriod('previous_month')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              period === 'previous_month'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            Mes Anterior
           </button>
           <button
             onClick={() => setPeriod('all')}

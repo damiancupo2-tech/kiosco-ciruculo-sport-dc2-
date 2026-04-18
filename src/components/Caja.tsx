@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, Shift, CashTransaction, Sale, SaleItem } from '../lib/supabase';
-import { Wallet, Plus, DollarSign, TrendingUp, TrendingDown, LogOut, Clock, Calendar, Filter, X, Download, ShoppingCart } from 'lucide-react';
+import { Wallet, Plus, DollarSign, TrendingUp, TrendingDown, LogOut, Clock, Calendar, Filter, X, Download, ShoppingCart, FileText, Share2, Copy, Check } from 'lucide-react';
 
 interface CajaProps {
   shift: Shift | null;
@@ -9,12 +9,24 @@ interface CajaProps {
 
 type PeriodType = 'today' | 'week' | 'month' | 'all' | 'custom';
 
+interface DailyReport {
+  date: string;
+  incomeCash: number;
+  incomeTransfer: number;
+  incomeQr: number;
+  expenseCash: number;
+  expenseTransfer: number;
+  expenseQr: number;
+  daily_total: number;
+}
+
 export default function Caja({ shift, onCloseShift }: CajaProps) {
   const [transactions, setTransactions] = useState<CashTransaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<CashTransaction[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showDailyReportModal, setShowDailyReportModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<CashTransaction | null>(null);
   const [saleDetails, setSaleDetails] = useState<Sale | null>(null);
   const [loadingSaleDetails, setLoadingSaleDetails] = useState(false);
@@ -22,6 +34,8 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
   const [period, setPeriod] = useState<PeriodType>('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+  const [dailyReports, setDailyReports] = useState<DailyReport[]>([]);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     type: 'income' as 'income' | 'expense',
     category: '',
@@ -149,6 +163,136 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
         setLoadingSaleDetails(false);
       }
     }
+  };
+
+  const generateDailyReports = () => {
+    const reportsByDate = new Map<string, DailyReport>();
+
+    filteredTransactions.forEach(t => {
+      const date = new Date(t.created_at).toLocaleDateString('es-AR');
+
+      if (!reportsByDate.has(date)) {
+        reportsByDate.set(date, {
+          date,
+          incomeCash: 0,
+          incomeTransfer: 0,
+          incomeQr: 0,
+          expenseCash: 0,
+          expenseTransfer: 0,
+          expenseQr: 0,
+          daily_total: 0
+        });
+      }
+
+      const report = reportsByDate.get(date)!;
+      const amount = Number(t.amount);
+
+      if (t.type === 'income') {
+        if (t.payment_method === 'efectivo') report.incomeCash += amount;
+        else if (t.payment_method === 'transferencia') report.incomeTransfer += amount;
+        else if (t.payment_method === 'qr') report.incomeQr += amount;
+      } else {
+        if (t.payment_method === 'efectivo') report.expenseCash += amount;
+        else if (t.payment_method === 'transferencia') report.expenseTransfer += amount;
+        else if (t.payment_method === 'qr') report.expenseQr += amount;
+      }
+    });
+
+    const reports = Array.from(reportsByDate.values())
+      .map(r => ({
+        ...r,
+        daily_total: r.incomeCash + r.incomeTransfer + r.incomeQr - r.expenseCash - r.expenseTransfer - r.expenseQr
+      }))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    setDailyReports(reports);
+    setShowDailyReportModal(true);
+  };
+
+  const exportDailyReportToCSV = () => {
+    const headers = ['Fecha', 'Ingreso Efectivo', 'Ingreso Transferencia', 'Ingreso QR', 'Egreso Efectivo', 'Egreso Transferencia', 'Egreso QR', 'Total Diario'];
+
+    const rows = dailyReports.map(r => [
+      r.date,
+      r.incomeCash.toFixed(2),
+      r.incomeTransfer.toFixed(2),
+      r.incomeQr.toFixed(2),
+      r.expenseCash.toFixed(2),
+      r.expenseTransfer.toFixed(2),
+      r.expenseQr.toFixed(2),
+      r.daily_total.toFixed(2)
+    ]);
+
+    const totalIncomeCash = dailyReports.reduce((sum, r) => sum + r.incomeCash, 0);
+    const totalIncomeTransfer = dailyReports.reduce((sum, r) => sum + r.incomeTransfer, 0);
+    const totalIncomeQr = dailyReports.reduce((sum, r) => sum + r.incomeQr, 0);
+    const totalExpenseCash = dailyReports.reduce((sum, r) => sum + r.expenseCash, 0);
+    const totalExpenseTransfer = dailyReports.reduce((sum, r) => sum + r.expenseTransfer, 0);
+    const totalExpenseQr = dailyReports.reduce((sum, r) => sum + r.expenseQr, 0);
+    const totalGeneral = dailyReports.reduce((sum, r) => sum + r.daily_total, 0);
+
+    rows.push(['TOTALES', totalIncomeCash.toFixed(2), totalIncomeTransfer.toFixed(2), totalIncomeQr.toFixed(2), totalExpenseCash.toFixed(2), totalExpenseTransfer.toFixed(2), totalExpenseQr.toFixed(2), totalGeneral.toFixed(2)]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row =>
+        row.map(value => {
+          const v = String(value ?? '');
+          if (v.includes(',') || v.includes('"') || v.includes('\n')) {
+            return `"${v.replace(/"/g, '""')}"`;
+          }
+          return v;
+        }).join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `planilla_diaria_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  const copyToClipboard = (text: string, index: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const shareReport = () => {
+    const text = generateReportText();
+    if (navigator.share) {
+      navigator.share({
+        title: 'Planilla Diaria de Caja',
+        text: text
+      });
+    } else {
+      copyToClipboard(text, -1);
+      alert('Planilla copiada al portapapeles');
+    }
+  };
+
+  const generateReportText = () => {
+    let text = 'PLANILLA DIARIA DE CAJA\n\n';
+    text += 'Fecha | Ing. Efvo | Ing. Transfer | Ing. QR | Egr. Efvo | Egr. Transfer | Egr. QR | Total\n';
+    text += '─'.repeat(100) + '\n';
+
+    dailyReports.forEach(r => {
+      text += `${r.date} | $${r.incomeCash.toFixed(2)} | $${r.incomeTransfer.toFixed(2)} | $${r.incomeQr.toFixed(2)} | $${r.expenseCash.toFixed(2)} | $${r.expenseTransfer.toFixed(2)} | $${r.expenseQr.toFixed(2)} | $${r.daily_total.toFixed(2)}\n`;
+    });
+
+    const totalIncomeCash = dailyReports.reduce((sum, r) => sum + r.incomeCash, 0);
+    const totalIncomeTransfer = dailyReports.reduce((sum, r) => sum + r.incomeTransfer, 0);
+    const totalIncomeQr = dailyReports.reduce((sum, r) => sum + r.incomeQr, 0);
+    const totalExpenseCash = dailyReports.reduce((sum, r) => sum + r.expenseCash, 0);
+    const totalExpenseTransfer = dailyReports.reduce((sum, r) => sum + r.expenseTransfer, 0);
+    const totalExpenseQr = dailyReports.reduce((sum, r) => sum + r.expenseQr, 0);
+    const totalGeneral = dailyReports.reduce((sum, r) => sum + r.daily_total, 0);
+
+    text += '─'.repeat(100) + '\n';
+    text += `TOTALES | $${totalIncomeCash.toFixed(2)} | $${totalIncomeTransfer.toFixed(2)} | $${totalIncomeQr.toFixed(2)} | $${totalExpenseCash.toFixed(2)} | $${totalExpenseTransfer.toFixed(2)} | $${totalExpenseQr.toFixed(2)} | $${totalGeneral.toFixed(2)}\n`;
+
+    return text;
   };
 
   const exportToCSV = () => {
@@ -347,7 +491,14 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
             ({filteredTransactions.length})
           </span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={generateDailyReports}
+            className="bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-lg transition-all"
+          >
+            <FileText size={18} />
+            Planilla
+          </button>
           <button
             onClick={exportToCSV}
             className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-lg transition-all"
@@ -806,6 +957,127 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
               >
                 Cerrar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Planilla Diaria */}
+      {showDailyReportModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-6xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-gradient-to-r from-blue-500 to-cyan-600 p-6 rounded-t-xl flex items-center justify-between sticky top-0">
+              <div className="flex items-center gap-3">
+                <FileText size={24} className="text-white" />
+                <h3 className="text-2xl font-bold text-white">Planilla Diaria de Caja</h3>
+              </div>
+              <button
+                onClick={() => setShowDailyReportModal(false)}
+                className="text-white hover:text-slate-200"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-100">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Fecha</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Ing. Efvo</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Ing. Transfer</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Ing. QR</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Egr. Efvo</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Egr. Transfer</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Egr. QR</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Total Diario</th>
+                      <th className="px-4 py-3 text-center font-semibold text-slate-700">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dailyReports.map((report, idx) => (
+                      <tr key={idx} className="border-t border-slate-200 hover:bg-slate-50">
+                        <td className="px-4 py-3 text-slate-900 font-medium">{report.date}</td>
+                        <td className="px-4 py-3 text-right text-emerald-600 font-semibold">${report.incomeCash.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-emerald-600 font-semibold">${report.incomeTransfer.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-emerald-600 font-semibold">${report.incomeQr.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-red-600 font-semibold">${report.expenseCash.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-red-600 font-semibold">${report.expenseTransfer.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-red-600 font-semibold">${report.expenseQr.toFixed(2)}</td>
+                        <td className={`px-4 py-3 text-right font-bold text-lg ${report.daily_total >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                          ${report.daily_total.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => {
+                              const rowText = `${report.date} | $${report.incomeCash.toFixed(2)} | $${report.incomeTransfer.toFixed(2)} | $${report.incomeQr.toFixed(2)} | $${report.expenseCash.toFixed(2)} | $${report.expenseTransfer.toFixed(2)} | $${report.expenseQr.toFixed(2)} | $${report.daily_total.toFixed(2)}`;
+                              copyToClipboard(rowText, idx);
+                            }}
+                            className="inline-flex items-center justify-center w-8 h-8 hover:bg-slate-200 rounded-lg transition-colors"
+                          >
+                            {copiedIndex === idx ? (
+                              <Check size={16} className="text-emerald-600" />
+                            ) : (
+                              <Copy size={16} className="text-slate-600" />
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-slate-100 border-t-2 border-slate-300">
+                    <tr>
+                      <td className="px-4 py-3 font-bold text-slate-900">TOTALES</td>
+                      <td className="px-4 py-3 text-right font-bold text-emerald-600">
+                        ${dailyReports.reduce((sum, r) => sum + r.incomeCash, 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-emerald-600">
+                        ${dailyReports.reduce((sum, r) => sum + r.incomeTransfer, 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-emerald-600">
+                        ${dailyReports.reduce((sum, r) => sum + r.incomeQr, 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-red-600">
+                        ${dailyReports.reduce((sum, r) => sum + r.expenseCash, 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-red-600">
+                        ${dailyReports.reduce((sum, r) => sum + r.expenseTransfer, 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-red-600">
+                        ${dailyReports.reduce((sum, r) => sum + r.expenseQr, 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-lg text-blue-600">
+                        ${dailyReports.reduce((sum, r) => sum + r.daily_total, 0).toFixed(2)}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              <div className="flex gap-3 pt-4 flex-wrap">
+                <button
+                  onClick={shareReport}
+                  className="flex-1 min-w-[150px] px-4 py-3 bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-semibold rounded-lg flex items-center justify-center gap-2 shadow-lg"
+                >
+                  <Share2 size={18} />
+                  Compartir
+                </button>
+                <button
+                  onClick={exportDailyReportToCSV}
+                  className="flex-1 min-w-[150px] px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold rounded-lg flex items-center justify-center gap-2 shadow-lg"
+                >
+                  <Download size={18} />
+                  Descargar CSV
+                </button>
+                <button
+                  onClick={() => setShowDailyReportModal(false)}
+                  className="flex-1 min-w-[150px] px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold rounded-lg"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>

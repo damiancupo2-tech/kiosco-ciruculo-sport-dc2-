@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, Product } from '../lib/supabase';
-import { Search, Plus, Edit2, Trash2, AlertTriangle, TrendingDown } from 'lucide-react';
+import { Search, Plus, CreditCard as Edit2, Trash2, AlertTriangle, TrendingDown, Grid3x3, List, FileText, Printer } from 'lucide-react';
 
 const PREDEFINED_CATEGORIES = ['Bebida', 'Comida', 'Artículos de Deporte'];
 
@@ -9,6 +9,8 @@ export default function Stock() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showInventorySheet, setShowInventorySheet] = useState(false);
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -228,9 +230,9 @@ export default function Stock() {
 
   return (
     <div className="space-y-6">
-      {/* BUSCADOR + NUEVO PRODUCTO */}
-      <div className="flex justify-between items-center">
-        <div className="relative flex-1 max-w-md">
+      {/* BUSCADOR + NUEVO PRODUCTO + BOTONES */}
+      <div className="flex justify-between items-center gap-4 flex-wrap">
+        <div className="relative flex-1 min-w-xs max-w-md">
           <Search
             className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"
             size={20}
@@ -244,13 +246,47 @@ export default function Stock() {
           />
         </div>
 
-        <button
-          onClick={openNewModal}
-          className="bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white px-6 py-2.5 rounded-xl flex items-center gap-2 shadow-lg transition-all duration-200 hover:scale-105"
-        >
-          <Plus size={20} />
-          Nuevo Producto
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`p-2.5 rounded-lg transition-all ${
+              viewMode === 'grid'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+            title="Vista Cuadrícula"
+          >
+            <Grid3x3 size={20} />
+          </button>
+
+          <button
+            onClick={() => setViewMode('list')}
+            className={`p-2.5 rounded-lg transition-all ${
+              viewMode === 'list'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+            title="Vista Lista"
+          >
+            <List size={20} />
+          </button>
+
+          <button
+            onClick={() => setShowInventorySheet(true)}
+            className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-lg transition-all duration-200 hover:scale-105"
+          >
+            <FileText size={20} />
+            Control de Stock
+          </button>
+
+          <button
+            onClick={openNewModal}
+            className="bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-lg transition-all duration-200 hover:scale-105"
+          >
+            <Plus size={20} />
+            Nuevo Producto
+          </button>
+        </div>
       </div>
 
       {/* ALERTA DE STOCK BAJO */}
@@ -281,9 +317,10 @@ export default function Stock() {
         </div>
       )}
 
-      {/* GRID DE PRODUCTOS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredProducts.map((product) => (
+      {/* GRID DE PRODUCTOS O LISTA */}
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredProducts.map((product) => (
           <div
             key={product.id}
             className="bg-gradient-to-br from-white to-slate-50 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 border border-slate-200 overflow-hidden group"
@@ -356,9 +393,162 @@ export default function Stock() {
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white">
+                  <th className="px-4 py-3 text-left font-semibold">Código</th>
+                  <th className="px-4 py-3 text-left font-semibold">Nombre</th>
+                  <th className="px-4 py-3 text-left font-semibold">Categoría</th>
+                  <th className="px-4 py-3 text-right font-semibold">Precio</th>
+                  <th className="px-4 py-3 text-right font-semibold">Stock</th>
+                  <th className="px-4 py-3 text-center font-semibold">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filteredProducts.map((product, index) => (
+                  <tr
+                    key={product.id}
+                    className={`hover:bg-slate-50 transition ${
+                      index % 2 === 0 ? 'bg-white' : 'bg-slate-50'
+                    }`}
+                  >
+                    <td className="px-4 py-3">
+                      <span className="font-mono bg-slate-100 px-2 py-1 rounded text-sm">
+                        {product.code}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-800">
+                      {product.name}
+                    </td>
+                    <td className="px-4 py-3">
+                      {product.category ? (
+                        <span className="bg-slate-200 text-slate-700 text-xs px-2 py-1 rounded">
+                          {product.category}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-600">
+                      ${product.price.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span
+                        className={`inline-flex px-3 py-1 rounded-full text-sm font-bold ${
+                          product.stock <= product.min_stock
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-emerald-100 text-emerald-700'
+                        }`}
+                      >
+                        {product.stock}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex justify-center gap-2">
+                        <button
+                          onClick={() => handleEdit(product)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(product.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-      {/* MODAL */}
+      {/* MODAL INVENTARIO */}
+      {showInventorySheet && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] shadow-2xl flex flex-col">
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-6 rounded-t-2xl flex justify-between items-center">
+              <h3 className="text-2xl font-bold text-white">
+                Control de Stock
+              </h3>
+              <button
+                onClick={() => window.print()}
+                className="bg-white text-emerald-600 px-4 py-2 rounded-lg font-semibold flex items-center gap-2 hover:bg-slate-100 transition"
+              >
+                <Printer size={20} />
+                Imprimir
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="bg-slate-50 rounded-xl overflow-hidden border border-slate-200">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-emerald-100 border-b border-emerald-300">
+                      <th className="px-4 py-3 text-left font-bold text-emerald-900">Código</th>
+                      <th className="px-4 py-3 text-left font-bold text-emerald-900">Producto</th>
+                      <th className="px-4 py-3 text-center font-bold text-emerald-900">Stock Teórico</th>
+                      <th className="px-4 py-3 text-center font-bold text-emerald-900">Stock Real</th>
+                      <th className="px-4 py-3 text-center font-bold text-emerald-900">Diferencia</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {products.map((product) => (
+                      <tr key={product.id} className="hover:bg-white transition">
+                        <td className="px-4 py-3">
+                          <span className="font-mono bg-white px-2 py-1 rounded text-sm font-semibold">
+                            {product.code}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-800">
+                          {product.name}
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold text-emerald-700">
+                          {product.stock}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="bg-white px-3 py-2 rounded border-2 border-slate-300 font-mono text-sm min-w-20">
+                            &nbsp;
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center text-slate-500 text-sm">
+                          -
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <p className="text-sm text-blue-800">
+                  <strong>Instrucciones:</strong> Completa la columna "Stock Real" con los valores contados manualmente.
+                  La columna "Diferencia" se calculará automáticamente. Puedes imprimir esta hoja para anotar los datos
+                  en terreno y luego compartirla digitalmente.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-100 p-4 rounded-b-2xl border-t border-slate-200 flex gap-3 justify-end">
+              <button
+                onClick={() => setShowInventorySheet(false)}
+                className="px-6 py-2.5 border-2 border-slate-300 text-slate-700 font-semibold rounded-xl hover:bg-slate-50 transition-all"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl animate-slideUp">

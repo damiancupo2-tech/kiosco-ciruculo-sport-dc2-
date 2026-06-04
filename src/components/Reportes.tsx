@@ -182,8 +182,8 @@ export default function Reportes() {
   };
 
   const exportToCSV = () => {
-    const formatNumber = (num: number): string => {
-      return num.toFixed(2).replace('.', ',');
+    const formatNumber = (num: number): number => {
+      return num;
     };
 
     // Columnas con el formato de tu Excel:
@@ -279,10 +279,10 @@ export default function Reportes() {
       const desc = tx.description || tx.category || 'Gasto';
       const lower = metodo.toLowerCase();
 
-      let efectivo = '';
-      let transferencia = '';
-      let qr = '';
-      let expensa = '';
+      let efectivo: number | string = '';
+      let transferencia: number | string = '';
+      let qr: number | string = '';
+      let expensa: number | string = '';
 
       const neg = formatNumber(-amount);
 
@@ -314,22 +314,25 @@ export default function Reportes() {
     });
 
     const csvContent = [
-      headers.join(','),
+      'sep=;',
+      headers.join(';'),
       ...rows.map((row) =>
         row
           .map((value) => {
+            if (typeof value === 'number') {
+              return String(value).replace('.', ',');
+            }
             const v = String(value ?? '');
-            // Escapar comas, comillas y saltos de línea
-            if (v.includes(',') || v.includes('"') || v.includes('\n')) {
+            if (v.includes(';') || v.includes('"') || v.includes('\n')) {
               return `"${v.replace(/"/g, '""')}"`;
             }
             return v;
           })
-          .join(',')
+          .join(';')
       ),
     ].join('\n');
 
-    const blob = new Blob([csvContent], {
+    const blob = new Blob(['\uFEFF' + csvContent], {
       type: 'text/csv;charset=utf-8;',
     });
     const link = document.createElement('a');

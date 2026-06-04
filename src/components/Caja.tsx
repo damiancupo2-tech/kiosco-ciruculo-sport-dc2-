@@ -225,13 +225,13 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
 
     const rows = dailyReports.map(r => [
       r.date,
-      r.incomeCash.toFixed(2),
-      r.incomeTransfer.toFixed(2),
-      r.incomeQr.toFixed(2),
-      r.expenseCash.toFixed(2),
-      r.expenseTransfer.toFixed(2),
-      r.expenseQr.toFixed(2),
-      r.daily_total.toFixed(2)
+      r.incomeCash,
+      r.incomeTransfer,
+      r.incomeQr,
+      r.expenseCash,
+      r.expenseTransfer,
+      r.expenseQr,
+      r.daily_total
     ]);
 
     const totalIncomeCash = dailyReports.reduce((sum, r) => sum + r.incomeCash, 0);
@@ -242,22 +242,26 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
     const totalExpenseQr = dailyReports.reduce((sum, r) => sum + r.expenseQr, 0);
     const totalGeneral = dailyReports.reduce((sum, r) => sum + r.daily_total, 0);
 
-    rows.push(['TOTALES', totalIncomeCash.toFixed(2), totalIncomeTransfer.toFixed(2), totalIncomeQr.toFixed(2), totalExpenseCash.toFixed(2), totalExpenseTransfer.toFixed(2), totalExpenseQr.toFixed(2), totalGeneral.toFixed(2)]);
+    rows.push(['TOTALES', totalIncomeCash, totalIncomeTransfer, totalIncomeQr, totalExpenseCash, totalExpenseTransfer, totalExpenseQr, totalGeneral]);
 
     const csvContent = [
-      headers.join(','),
+      'sep=;',
+      headers.join(';'),
       ...rows.map(row =>
         row.map(value => {
+          if (typeof value === 'number') {
+            return String(value).replace('.', ',');
+          }
           const v = String(value ?? '');
-          if (v.includes(',') || v.includes('"') || v.includes('\n')) {
+          if (v.includes(';') || v.includes('"') || v.includes('\n')) {
             return `"${v.replace(/"/g, '""')}"`;
           }
           return v;
-        }).join(',')
+        }).join(';')
       )
     ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `planilla_diaria_${new Date().toISOString().split('T')[0]}.csv`;
@@ -316,26 +320,30 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
         date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }),
         t.type === 'income' ? 'Ingreso' : 'Egreso',
         t.category,
-        t.amount.toFixed(2),
+        t.amount,
         t.payment_method,
         t.description || ''
       ];
     });
 
     const csvContent = [
-      headers.join(','),
+      'sep=;',
+      headers.join(';'),
       ...rows.map(row =>
         row.map(value => {
+          if (typeof value === 'number') {
+            return String(value).replace('.', ',');
+          }
           const v = String(value ?? '');
-          if (v.includes(',') || v.includes('"') || v.includes('\n')) {
+          if (v.includes(';') || v.includes('"') || v.includes('\n')) {
             return `"${v.replace(/"/g, '""')}"`;
           }
           return v;
-        }).join(',')
+        }).join(';')
       )
     ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `movimientos_caja_${new Date().toISOString().split('T')[0]}.csv`;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, Package, Wallet, BarChart3, Settings, Store, TrendingUp, ShoppingBag } from 'lucide-react';
+import { ShoppingCart, Package, Wallet, BarChart3, Settings, Store, TrendingUp, ShoppingBag, UtensilsCrossed } from 'lucide-react';
 import { Shift, supabase, CashTransaction } from '../lib/supabase';
 import Ventas from './Ventas';
 import Stock from './Stock';
@@ -8,8 +8,9 @@ import Reportes from './Reportes';
 import Configuracion from './Configuracion';
 import Movimientos from './Movimientos';
 import Compras from './Compras';
+import Mesas from './Mesas';
 
-type View = 'ventas' | 'stock' | 'movimientos' | 'caja' | 'reportes' | 'configuracion' | 'compras';
+type View = 'ventas' | 'mesas' | 'stock' | 'movimientos' | 'caja' | 'reportes' | 'configuracion' | 'compras';
 
 interface DashboardProps {
   shift: Shift | null;
@@ -165,11 +166,12 @@ export default function Dashboard({ shift, onCloseShift }: DashboardProps) {
 
   const menuItems = [
     { id: 'ventas' as View, label: 'Ventas', icon: ShoppingCart, color: 'from-emerald-500 to-teal-600' },
-    { id: 'compras' as View, label: 'Compras', icon: ShoppingBag, color: 'from-rose-500 to-pink-600' },
+    { id: 'mesas' as View, label: 'Mesas', icon: UtensilsCrossed, color: 'from-rose-500 to-pink-600' },
+    { id: 'compras' as View, label: 'Compras', icon: ShoppingBag, color: 'from-amber-500 to-orange-600' },
     { id: 'stock' as View, label: 'Inventario', icon: Package, color: 'from-blue-500 to-cyan-600' },
-    { id: 'movimientos' as View, label: 'Movimientos', icon: TrendingUp, color: 'from-amber-500 to-orange-600' },
-    { id: 'caja' as View, label: 'Caja', icon: Wallet, color: 'from-violet-500 to-purple-600' },
-    { id: 'reportes' as View, label: 'Reportes', icon: BarChart3, color: 'from-cyan-500 to-blue-600' },
+    { id: 'movimientos' as View, label: 'Movimientos', icon: TrendingUp, color: 'from-violet-500 to-purple-600' },
+    { id: 'caja' as View, label: 'Caja', icon: Wallet, color: 'from-cyan-500 to-blue-600' },
+    { id: 'reportes' as View, label: 'Reportes', icon: BarChart3, color: 'from-orange-500 to-amber-600' },
     { id: 'configuracion' as View, label: 'Configuración', icon: Settings, color: 'from-gray-500 to-slate-600' },
   ];
 
@@ -329,6 +331,7 @@ export default function Dashboard({ shift, onCloseShift }: DashboardProps) {
 
               <div className="p-6">
                 {currentView === 'ventas' && <Ventas shift={shift} />}
+                {currentView === 'mesas' && <Mesas shift={shift} />}
                 {currentView === 'compras' && <Compras />}
                 {currentView === 'stock' && <Stock />}
                 {currentView === 'movimientos' && shift && <Movimientos shift={shift} />}

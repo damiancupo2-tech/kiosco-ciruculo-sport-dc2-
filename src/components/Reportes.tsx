@@ -16,6 +16,7 @@ export default function Reportes() {
   const [cashTransactions, setCashTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState('today');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'kiosco' | 'mesas'>('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
@@ -31,7 +32,7 @@ export default function Reportes() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [dateFilter, customStartDate, customEndDate]);
+  }, [dateFilter, customStartDate, customEndDate, sourceFilter]);
 
   const loadConfig = async () => {
     const { data } = await supabase
@@ -210,8 +211,8 @@ export default function Reportes() {
 
     const rows: (string | number)[][] = [];
 
-    // 1) Ventas
-    sales.forEach((sale) => {
+    // 1) Ventas (filtradas por origen)
+    filteredSales.forEach((sale) => {
       const items = Array.isArray(sale.items) ? sale.items : [];
       const cliente =
         (sale as any).customer_name || (sale as any).customer || 'Cliente general';
@@ -349,7 +350,7 @@ export default function Reportes() {
     const printWindow = window.open('', '', 'height=600,width=800');
     if (!printWindow) return;
 
-    const totalSales = sales.reduce((sum, s) => sum + Number(s.total), 0);
+    const totalSales = filteredSales.reduce((sum, s) => sum + Number(s.total), 0);
 
     printWindow.document.write(`
       <html>
@@ -375,6 +376,9 @@ export default function Reportes() {
               ? 'Último Mes'
               : 'Todo'
           }</p>
+          <p><strong>Origen:</strong> ${
+            sourceFilter === 'mesas' ? 'Solo Mesas' : sourceFilter === 'kiosco' ? 'Solo Kiosco' : 'Todos'
+          }</p>
           <p><strong>Fecha de emisión:</strong> ${new Date().toLocaleString(
             'es-AR'
           )}</p>
@@ -390,7 +394,7 @@ export default function Reportes() {
               </tr>
             </thead>
             <tbody>
-              ${sales
+              ${filteredSales
                 .map((sale) => {
                   const items = Array.isArray(sale.items) ? sale.items : [];
                   const itemCount = items.reduce(
@@ -414,7 +418,7 @@ export default function Reportes() {
             </tbody>
           </table>
           <div class="total">
-            Total de Ventas: ${sales.length} | Monto Total: $${totalSales.toFixed(
+            Total de Ventas: ${filteredSales.length} | Monto Total: ${totalSales.toFixed(
       2
     )}
           </div>
@@ -525,17 +529,23 @@ export default function Reportes() {
     printWindow.print();
   };
 
-  const totalSales = sales.reduce((sum, s) => sum + Number(s.total), 0);
-  const totalItems = sales.reduce((sum, s) => {
+  const filteredSales = sales.filter((s) => {
+    if (sourceFilter === 'mesas') return s.sale_number.startsWith('M-');
+    if (sourceFilter === 'kiosco') return !s.sale_number.startsWith('M-');
+    return true;
+  });
+
+  const totalSales = filteredSales.reduce((sum, s) => sum + Number(s.total), 0);
+  const totalItems = filteredSales.reduce((sum, s) => {
     const items = Array.isArray(s.items) ? s.items : [];
     return (
       sum +
       items.reduce((itemSum, item) => itemSum + item.quantity, 0)
     );
   }, 0);
-  const avgTicket = sales.length > 0 ? totalSales / sales.length : 0;
+  const avgTicket = filteredSales.length > 0 ? totalSales / filteredSales.length : 0;
 
-  const paymentMethodTotals = sales.reduce((acc, s) => {
+  const paymentMethodTotals = filteredSales.reduce((acc, s) => {
     acc[s.payment_method] = (acc[s.payment_method] || 0) + Number(s.total);
     return acc;
   }, {} as Record<string, number>);
@@ -557,6 +567,15 @@ export default function Reportes() {
             <option value="month">Último Mes</option>
             <option value="custom">Personalizado</option>
             <option value="all">Todo</option>
+          </select>
+          <select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value as 'all' | 'kiosco' | 'mesas')}
+            className="px-4 py-2 bg-white border-2 border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-orange-500"
+          >
+            <option value="all">Todos los orígenes</option>
+            <option value="kiosco">Solo Kiosco</option>
+            <option value="mesas">Solo Mesas</option>
           </select>
           {dateFilter === 'custom' && (
             <>
@@ -680,7 +699,7 @@ export default function Reportes() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-200">
-                  {sales.map((sale) => {
+                  {filteredSales.map((sale) => {
                     const items = Array.isArray(sale.items) ? sale.items : [];
                     const itemCount = items.reduce(
                       (sum, item) => sum + item.quantity,
@@ -720,9 +739,9 @@ export default function Reportes() {
                   })}
                 </tbody>
               </table>
-              {sales.length === 0 && (
+              {filteredSales.length === 0 && (
                 <div className="text-center py-8 text-slate-500">
-                  No hay ventas para mostrar en este período
+                  No hay ventas para mostrar en este período con el filtro seleccionado
                 </div>
               )}
             </div>

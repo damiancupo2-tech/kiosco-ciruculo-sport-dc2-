@@ -154,8 +154,8 @@ export default function Caja({ shift, onCloseShift }: CajaProps) {
     if (transaction.category === 'venta' && transaction.description) {
       setLoadingSaleDetails(true);
       try {
-        // Extraer el número de venta de la descripción (formato: "Venta V-1769655272303 - ...")
-        const match = transaction.description.match(/V-\d+/);
+        // Extraer el número de venta de la descripción (V- = Ventas, M- = Mesas)
+        const match = transaction.description.match(/[VM]-\d+/);
         if (match) {
           const saleNumber = match[0];
           const { data } = await supabase
